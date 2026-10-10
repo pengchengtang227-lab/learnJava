@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="CglibProxyDemo" type="Application" factoryName="Application" nameIsGenerated="true">
+    <option name="MAIN_CLASS_NAME" value="DynamicProxy.CglibProxyDemo" />
+    <option name="VM_PARAMETERS" value="--add-opens java.base/java.lang=ALL-UNNAMED" />
+    <module name="learnJava" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
