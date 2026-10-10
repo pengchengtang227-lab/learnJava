@@ -28,8 +28,4 @@ public class InitTarget {
         System.out.println("InitTarget 的静态字段开始初始化11111");
         return "初始化完成";
     }
-
-    public static String getMessage() {
-        return MESSAGE;
-    }
 }
