@@ -1,0 +1,24 @@
+# Spring Boot 读取此文件，自动创建数据源、连接池、事务管理器和 Web 容器。
+server:
+  address: 127.0.0.1
+  port: 8080
+
+spring:
+  application:
+    name: springboot-study
+  datasource:
+    # 内存数据库仅供学习：应用停止后数据消失，下次启动重新加载初始数据。
+    url: jdbc:h2:mem:springstudy;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+  sql:
+    init:
+      # 先执行 schema.sql 建表，再执行 data.sql 初始化演示账户。
+      mode: always
+
+logging:
+  charset:
+    # 显式使用 UTF-8，便于在 Windows 终端和 IDEA 中阅读中文日志。
+    console: UTF-8
+  level:
+    com.example.springstudy: INFO

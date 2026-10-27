@@ -1,0 +1,63 @@
+### 在 IDEA 中点击每个请求旁的运行按钮。应用需要先启动。
+@baseUrl = http://127.0.0.1:8080
+
+### 1. 初始余额：小明 100000 分，小红 50000 分
+GET {{baseUrl}}/api/accounts
+
+### 2. 查询单个账户
+GET {{baseUrl}}/api/accounts/1
+
+### 3. 正常转账 1000 分（10 元），预期 200 / SUCCESS
+POST {{baseUrl}}/api/transfers
+Content-Type: application/json
+
+{
+  "fromAccountId": 1,
+  "toAccountId": 2,
+  "amountInCents": 1000,
+  "simulateFailure": false
+}
+
+### 4. 查询转账后余额：如果上一个请求执行一次，则为 99000 / 51000 分
+GET {{baseUrl}}/api/accounts
+
+### 5. 模拟失败，预期 409 / DEMO_ROLLBACK
+# SQL 会先更新两边余额并插入记录，再主动抛出异常。
+POST {{baseUrl}}/api/transfers
+Content-Type: application/json
+
+{
+  "fromAccountId": 1,
+  "toAccountId": 2,
+  "amountInCents": 1000,
+  "simulateFailure": true
+}
+
+### 6. 验证回滚：余额应与第 4 步完全相同
+GET {{baseUrl}}/api/accounts
+
+### 7. 参数校验：金额为负数，预期 400 / INVALID_REQUEST
+POST {{baseUrl}}/api/transfers
+Content-Type: application/json
+
+{
+  "fromAccountId": 1,
+  "toAccountId": 2,
+  "amountInCents": -100
+}
+
+### 8. 余额不足，预期 409 / INSUFFICIENT_BALANCE
+POST {{baseUrl}}/api/transfers
+Content-Type: application/json
+
+{
+  "fromAccountId": 1,
+  "toAccountId": 2,
+  "amountInCents": 100000000
+}
+
+### 9. 账户不存在，预期 404 / ACCOUNT_NOT_FOUND
+GET {{baseUrl}}/api/accounts/999
+
+### 10. 路径参数不合法，预期 400 / INVALID_REQUEST
+GET {{baseUrl}}/api/accounts/0

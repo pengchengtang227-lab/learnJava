@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 独立学习项目：不继承外层练习项目的依赖，避免旧日志依赖与 Spring Boot 冲突。 -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.2</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example.learning</groupId>
+    <artifactId>springboot-study</artifactId>
+    <version>1.0.0</version>
+    <name>springboot-study</name>
+    <description>通过账户转账学习接口、事务、全局异常处理和 AOP</description>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+
+    <!-- Spring Boot 统一管理下面的版本，不单独指定 Spring Framework 等依赖版本。 -->
+    <dependencies>
+        <!-- Spring MVC：接收 HTTP 请求，将 Java 对象序列化为 JSON。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <!-- 参数校验：提供 @Valid、@NotNull、@Positive 等注解。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <!-- JDBC、连接池和事务管理器均由 Spring Boot 自动配置。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <!-- Boot 4 使用 aspectj starter，运行时仍是 Spring AOP 的代理模式。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
+        </dependency>
+        <!-- 内存数据库：无需安装 MySQL，启动即可体验真实 SQL 事务。 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- Boot 4 的 MVC 测试 starter，包括 MockMvc 和通用测试支持。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- 支持 spring-boot:run，并将应用打包为可执行 jar。 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
