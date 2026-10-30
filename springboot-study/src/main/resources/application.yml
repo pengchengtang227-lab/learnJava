@@ -17,6 +17,9 @@ spring:
       mode: always
 
 logging:
+  pattern:
+    # 在日志级别后追加 RequestIdFilter 放进 MDC 的请求 ID；没有请求上下文时（如启动日志）显示为空。
+    level: "%5p [%X{requestId:-}]"
   charset:
     # 显式使用 UTF-8，便于在 Windows 终端和 IDEA 中阅读中文日志。
     console: UTF-8
