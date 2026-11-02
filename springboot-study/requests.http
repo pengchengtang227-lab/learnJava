@@ -61,3 +61,18 @@ GET {{baseUrl}}/api/accounts/999
 
 ### 10. 路径参数不合法，预期 400 / INVALID_REQUEST
 GET {{baseUrl}}/api/accounts/0
+
+### 11. Actuator 健康检查：查看应用和 H2 数据库状态，正常时 status 为 UP
+GET {{baseUrl}}/actuator/health
+
+### 12. Actuator 应用信息：查看 application.yml 中配置的 info.app
+GET {{baseUrl}}/actuator/info
+
+### 13. Actuator 指标目录：列出当前可查询的指标名称
+GET {{baseUrl}}/actuator/metrics
+
+### 14. JVM 内存使用量：单位为字节，可通过标签进一步筛选
+GET {{baseUrl}}/actuator/metrics/jvm.memory.used
+
+### 15. HTTP 请求统计：先发送上面的业务请求，再查看请求次数和耗时
+GET {{baseUrl}}/actuator/metrics/http.server.requests

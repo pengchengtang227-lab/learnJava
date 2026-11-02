@@ -29,6 +29,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
+        <!-- Actuator：提供健康检查、应用信息和运行指标等监控端点。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
         <!-- 参数校验：提供 @Valid、@NotNull、@Positive 等注解。 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

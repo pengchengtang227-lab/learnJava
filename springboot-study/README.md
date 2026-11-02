@@ -57,6 +57,24 @@ macOS / Linux 可使用 `sh ./mvnw test` 或 `sh ./mvnw spring-boot:run`。
 
 集成测试包含一个主动触发数据库溢出的用例，用来验证 500 兜底和事务回滚；运行时会出现该用例预期的 ERROR 堆栈，最终以 `Tests run: 20, Failures: 0, Errors: 0` 判断测试通过。
 
+## Actuator 监控与管理
+
+项目通过 `spring-boot-starter-actuator` 引入监控能力，无需自己编写 Controller。`application.yml` 开放了以下 HTTP 端点，启动后即可在浏览器或 [requests.http](requests.http) 中访问：
+
+| 地址 | 用途 | 关注的内容 |
+| --- | --- | --- |
+| <http://127.0.0.1:8080/actuator/health> | 健康检查 | 总体 `status`，以及 `components.db` 中的 H2 数据库状态 |
+| <http://127.0.0.1:8080/actuator/info> | 应用信息 | `info.app` 配置的名称和描述 |
+| <http://127.0.0.1:8080/actuator/metrics> | 指标目录 | `names` 中列出的 JVM、连接池和 HTTP 等指标 |
+| <http://127.0.0.1:8080/actuator/metrics/jvm.memory.used> | JVM 已用内存 | `measurements` 中的内存用量，单位为字节 |
+| <http://127.0.0.1:8080/actuator/metrics/http.server.requests> | HTTP 请求统计 | 请求次数、总耗时和最大耗时；先发送一次请求再查看 |
+
+健康检查正常时，总体状态为 `"status": "UP"`。配置中的 `show-details: always` 便于在本机查看数据库检查详情；应用当前只监听 `127.0.0.1`，对外部署时应限制监控访问，并调整健康详情的展示策略。
+
+`management.info.env.enabled: true` 用于将显式配置的 `info.*` 信息加入 `/actuator/info`，与读取环境变量的 `/actuator/env` 是不同的功能。本项目按需开放 `health,info,metrics`，Actuator 响应使用框架自己的 JSON 结构。
+
+若修改了应用端口，上述地址也要使用相同端口。引入依赖后，在 IDEA 中重新加载 Maven 项目并重启应用。
+
 ## 先完成一次实验
 
 打开 [requests.http](requests.http)，在 IDEA HTTP Client 中按编号发送请求。若 IDEA 未提供 HTTP Client，也可以在应用启动后使用 PowerShell：

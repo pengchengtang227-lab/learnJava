@@ -16,6 +16,27 @@ spring:
       # 先执行 schema.sql 建表，再执行 data.sql 初始化演示账户。
       mode: always
 
+# Actuator 使用相同的本机地址和端口，访问路径默认为 /actuator。
+management:
+  endpoints:
+    web:
+      exposure:
+        # 按需开放端点，便于学习健康检查、应用信息和运行指标。
+        include: health,info,metrics
+  endpoint:
+    health:
+      # 当前仅监听 127.0.0.1，展示数据库等检查详情；对外部署时应限制详情访问。
+      show-details: always
+  info:
+    env:
+      # 将下方 info.* 中显式配置的应用信息加入 /actuator/info 响应。
+      enabled: true
+
+info:
+  app:
+    name: ${spring.application.name}
+    description: Spring Boot 账户转账学习项目
+
 logging:
   pattern:
     # 在日志级别后追加 RequestIdFilter 放进 MDC 的请求 ID；没有请求上下文时（如启动日志）显示为空。
