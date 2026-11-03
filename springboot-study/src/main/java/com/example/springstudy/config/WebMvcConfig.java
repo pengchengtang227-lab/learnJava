@@ -2,26 +2,34 @@ package com.example.springstudy.config;
 
 import com.example.springstudy.interceptor.AccessLogInterceptor;
 import com.example.springstudy.interceptor.LoginInterceptor;
-import java.util.Map;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * 注册拦截器。过滤器靠 @Component 自动注册，拦截器则必须在这里手动加入，并指定生效的路径。
+ * 注册拦截器及其生效路径。拦截器声明为 Spring Bean 后，仍需加入 MVC 的执行链。
  */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
+    private final AccessLogInterceptor accessLogInterceptor;
+    private final LoginInterceptor loginInterceptor;
+
+    public WebMvcConfig(AccessLogInterceptor accessLogInterceptor, LoginInterceptor loginInterceptor) {
+        this.accessLogInterceptor = accessLogInterceptor;
+        this.loginInterceptor = loginInterceptor;
+    }
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new AccessLogInterceptor())
-                // 只拦截业务接口；多个拦截器的 preHandle 按注册顺序执行，afterCompletion 按相反顺序执行。
-                .addPathPatterns("/api/**");
+        registry.addInterceptor(accessLogInterceptor)
+                .addPathPatterns("/api/**")
+                // 日志先进入、后退出，登录校验拒绝的请求也能记录状态码和耗时。
+                .order(0);
 
         // 登录校验只作用于 /api/secure/**，其余学习用的接口保持匿名可访问。
-        // 演示令牌写死在代码里；真实项目的令牌来自登录接口签发的 JWT 或服务端会话。
-        registry.addInterceptor(new LoginInterceptor(Map.of("demo-token", "alice")))
-                .addPathPatterns("/api/secure/**");
+        registry.addInterceptor(loginInterceptor)
+                .addPathPatterns("/api/secure/**")
+                .order(1);
     }
 }

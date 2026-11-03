@@ -13,7 +13,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * 拦截器能拿到 handler（具体处理请求的 Controller 方法），这是过滤器做不到的。
  * 和 ApiLogAspect 的分工：切面只能看到 Controller 方法的调用，拿不到 HTTP 状态码，
  * 而且参数校验失败、404 等请求根本不会进入 Controller 方法；拦截器的 afterCompletion 对这些请求也会执行。
- * 它不是 @Component，由 WebMvcConfig 注册，并决定拦截哪些路径。
+ * 它由 InterceptorConfig 声明为 Spring Bean，再由 WebMvcConfig 注册并决定拦截哪些路径。
  */
 public class AccessLogInterceptor implements HandlerInterceptor {
 

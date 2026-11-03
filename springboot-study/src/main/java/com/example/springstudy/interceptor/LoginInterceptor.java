@@ -15,7 +15,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * 登录拦截器：在 Controller 执行前检查请求头 Authorization: Bearer &lt;token&gt;。
  * 没有令牌或令牌无效时，直接返回 401 并终止请求，Controller 不会被调用。
  * 学习用途：令牌只和固定的“令牌 -> 用户名”表比较。真实项目应校验 JWT 签名与过期时间，或到 Redis / 数据库查询会话。
- * 和 AccessLogInterceptor 一样不是 @Component，由 WebMvcConfig 注册并决定生效路径。
+ * 和 AccessLogInterceptor 一样，由 InterceptorConfig 声明为 Spring Bean，再由 WebMvcConfig 注册并决定生效路径。
  */
 public class LoginInterceptor implements HandlerInterceptor {
 
