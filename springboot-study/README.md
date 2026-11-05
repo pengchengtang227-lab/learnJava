@@ -178,6 +178,43 @@ Spring cron 的六个字段是“秒 分 时 日 月 周”；每天北京时间
 | 重复触发也不产生重复业务效果 | 幂等，例如只对仍未支付且已过期的订单进行数据库条件更新 |
 | 同一时刻只允许一个实例执行 | 使用正确实现的分布式锁，或调度平台的实例分派策略 |
 
+## Spring 事件与启动任务学习示例
+
+正常启动 `SpringStudyApplication.main()` 或执行 `.\mvnw.cmd spring-boot:run`，会自动触发一次用户注册事件示例。
+在控制台搜索 `[事件示例]`，即可观察启动事件、Runner 和自定义事件的关系，无需发送 HTTP 请求。
+注册、发送欢迎邮件均使用日志模拟，不实际写入用户数据或发送邮件。
+
+| 文件 | 职责与关注点 |
+| --- | --- |
+| `event/UserRegisteredEvent.java` | 事件对象，只携带用户 ID；普通 Java 对象即可，不需要注册成 Bean |
+| `service/UserRegistrationService.java`、`service/impl/UserRegistrationServiceImpl.java` | 模拟注册，通过构造器注入的 `ApplicationEventPublisher` 发布事件 |
+| `event/UserRegisteredEventListener.java` | `@Component` 注册监听器，`@EventListener` 根据参数类型监听用户注册事件 |
+| `task/EventDemoRunner.java` | 实现 `CommandLineRunner`，在容器刷新完成后调用 Service，触发一次示例 |
+| `event/ApplicationLifecycleListener.java` | 监听 `ApplicationStartedEvent` 和 `ApplicationReadyEvent`，观察 Runner 前后的启动阶段 |
+
+过滤出 `[事件示例]` 日志后，应看到以下顺序：
+
+```text
+ApplicationStartedEvent：容器刷新完成，尚未执行 Runner
+Runner：启动任务开始
+注册服务：模拟注册成功，准备发布事件，userId=1001
+用户监听器：收到注册事件，模拟发送欢迎邮件，userId=1001
+注册服务：发布方法已返回，同步监听器已经执行完毕
+Runner：启动任务执行结束
+ApplicationReadyEvent：Runner 已执行完，应用就绪
+```
+
+| 观察点 | 说明 |
+| --- | --- |
+| 发布订阅 | 注册服务不直接调用邮件监听器，而是发布“注册成功”事件，Spring 将事件交给匹配的监听器 |
+| 默认同步 | 本例未配置异步广播器，也未使用 `@Async`，监听器与发布者在同一调用线程中执行；因此监听器日志出现在发布方法返回之前 |
+| 两种事件来源 | `UserRegisteredEvent` 由业务代码发布；`ApplicationStartedEvent`、`ApplicationReadyEvent` 由 Spring Boot 发布 |
+| Runner 与事件监听 | Runner 主动执行启动任务；监听器在对应事件发布时执行。本例由 Runner 触发业务，业务再发布自定义事件 |
+| 早期启动事件 | `ApplicationStartingEvent` 等发生时，普通监听器 Bean 尚未准备好，不能直接套用本例的组件监听方式，需要提前注册监听器 |
+
+建议依次在 Runner、注册 Service 的 `publishEvent(...)`、用户监听器和 `onReady(...)` 处打断点。
+观察 Service 到监听器的调用栈，再返回 Service，能够直接看出默认同步执行的特点。
+
 ## 推荐阅读顺序
 
 Java 源码统一位于 `src/main/java/com/example/springstudy/`。
