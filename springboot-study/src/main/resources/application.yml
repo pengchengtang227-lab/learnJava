@@ -4,17 +4,48 @@ server:
   port: 8080
 
 spring:
+  config:
+    import:
+      # 兼容在仓库根目录或 springboot-study 目录启动；本机密码文件不打包进 jar。
+      - optional:file:./springboot-study/application-local.properties
+      - optional:file:./application-local.properties
   application:
     name: springboot-study
   datasource:
-    # 内存数据库仅供学习：应用停止后数据消失，下次启动重新加载初始数据。
-    url: jdbc:h2:mem:springstudy;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password: ""
+    # 默认直接连接本地 MySQL，库需提前创建；真实密码由本地配置覆盖。
+    # UPDATE 返回匹配行数，相同内容重复提交也视为成功。
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:springboot_study}?characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&sslMode=DISABLED&connectTimeout=5000&socketTimeout=10000&useAffectedRows=false
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
   sql:
     init:
-      # 先执行 schema.sql 建表，再执行 data.sql 初始化演示账户。
-      mode: always
+      # 表结构与演示数据统一交给 Flyway，避免两套初始化机制同时执行。
+      mode: never
+  flyway:
+    locations: classpath:db/migration
+    # 已有数据库首次接入时，核对结构后临时开启 baseline-on-migrate，详见 MYBATIS.md。
+    # 以 0 为基线，让兼容已有表的 V1 也执行，补齐缺失的演示账户。
+    baseline-version: 0
+    baseline-on-migrate: false
+
+# Mapper 接口上的 @Mapper 由 Starter 扫描；XML 中保存具体 SQL。
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+
+# 启动后访问 /swagger-ui.html，在浏览器中填写参数并调用接口。
+springdoc:
+  # 仅展示本项目的业务接口，避免将框架提供的端点混入列表。
+  packages-to-scan: com.example.springstudy.controller
+  paths-to-match: /api/**
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+    doc-expansion: none
+    # 展开接口后直接进入可填写状态，点击 Execute 即可发送请求。
+    try-it-out-enabled: true
+    disable-swagger-default-url: true
 
 # Actuator 使用相同的本机地址和端口，访问路径默认为 /actuator。
 management:
@@ -46,3 +77,5 @@ logging:
     console: UTF-8
   level:
     com.example.springstudy: INFO
+    # 学习时观察 Preparing、Parameters、Total，理解 SQL、参数绑定与结果数量。
+    com.example.springstudy.mapper: DEBUG

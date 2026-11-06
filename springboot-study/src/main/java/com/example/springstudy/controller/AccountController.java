@@ -5,6 +5,9 @@ import com.example.springstudy.dto.TransferRequest;
 import com.example.springstudy.dto.TransferVO;
 import com.example.springstudy.model.AccountDO;
 import com.example.springstudy.service.AccountService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api")
+@Tag(name = "账户与转账", description = "查询演示账户，学习转账和事务回滚")
 public class AccountController {
 
     // 业务日志：记录“业务上发生了什么”。方法的开始/结束/耗时已由 ApiLogAspect 统一记录，这里不重复。
@@ -35,6 +39,7 @@ public class AccountController {
     }
 
     @GetMapping("/accounts")
+    @Operation(summary = "查询账户列表")
     public ApiResponse<List<AccountDO>> listAccounts() {
         List<AccountDO> accounts = accountService.listAccounts();
         LOGGER.info("查询账户列表：共 {} 个账户", accounts.size());
@@ -43,7 +48,10 @@ public class AccountController {
 
     // 路径参数示例：GET /api/accounts/1。Spring MVC 自动执行 @Positive 校验。
     @GetMapping("/accounts/{id}")
-    public ApiResponse<AccountDO> getAccount(@PathVariable("id") @Positive Long accountId) {
+    @Operation(summary = "查询账户详情")
+    public ApiResponse<AccountDO> getAccount(
+            @Parameter(description = "演示账户 ID，初始账户为 1 和 2", example = "1")
+            @PathVariable("id") @Positive Long accountId) {
         // {} 是占位符，参数不会提前拼接字符串，日志级别未开启时几乎没有开销。
         LOGGER.info("查询账户详情：accountId={}", accountId);
         return ApiResponse.success(accountService.getAccount(accountId));
@@ -51,6 +59,7 @@ public class AccountController {
 
     // @RequestBody 将 JSON 转为 Java 对象，@Valid 触发对象字段上的约束。
     @PostMapping("/transfers")
+    @Operation(summary = "账户转账", description = "金额单位为分。simulateFailure 为 true 时主动失败并回滚。")
     public ApiResponse<TransferVO> transfer(@Valid @RequestBody TransferRequest request) {
         // 走到这里说明参数校验已通过。只记录账户 ID 和金额等排查需要的字段，不打印整个请求对象。
         LOGGER.info("收到转账请求：from={}，to={}，金额={}分，模拟失败={}",

@@ -1,6 +1,8 @@
-# Spring Boot 动手学习：账户转账
+# Spring Boot 动手学习：账户转账与 MyBatis 用户管理
 
 这是当前 Java 练习仓库中的独立 Maven 项目，通过一个转账流程串起 HTTP 接口、依赖注入、参数校验、数据库事务、全局异常处理和 AOP 日志。代码包含中文注释，建议按下方阅读顺序学习。
+
+新增的 **MyBatis 用户 CRUD + 本地 MySQL** 示例见 [MYBATIS.md](MYBATIS.md)，包含连接配置、启动步骤、接口示例和源码阅读顺序。应用默认连接本机 MySQL，数据持久保存，直接运行启动类即可。
 
 ## 技术版本与环境
 
@@ -10,14 +12,19 @@
 | Spring Boot | 4.1.2 | 2026-10-24 从 Maven Central 核实的最新正式版 |
 | Spring Framework | 7.0.10，由 Spring Boot 管理 | 避免手工组合 Spring 组件版本 |
 | JDBC、Validation、日志 | 由 Spring Boot 统一管理 | 避免依赖版本冲突 |
-| 数据库 | H2 2.4.240 内存数据库，由 Spring Boot 管理 | 无需安装 MySQL，仍可执行真实 SQL 和事务 |
+| 数据库 | 本机 MySQL，驱动由 Spring Boot 管理 | 默认连接 springboot_study，重启保留数据 |
+| MyBatis | Starter 4.1.0，适配 Spring Boot 4.1 | 通过 Mapper 接口和 XML 完成用户 CRUD |
+| 数据库迁移 | Flyway，版本由 Spring Boot 管理 | 通过版本 SQL 管理初始化、字段和索引变更 |
+| 接口操作页面 | springdoc-openapi 3.2.0 + Swagger UI | 浏览器中直接查看和调用接口 |
 | Maven | Wrapper 固定为 3.9.16 | 本机无需预先安装 Maven，首次运行需要联网下载 |
 
 Maven Central 同时存在 4.2.0-RC1 等预发布版本，本示例选择正式版。Boot 4 使用 `jakarta.*`，Web 和 AOP starter 分别使用 `spring-boot-starter-webmvc`、`spring-boot-starter-aspectj`。
 
 外层项目的 `pom.xml` 和 Java 练习代码保持原样。本项目不继承外层 POM，请单独导入当前目录的 `pom.xml`。
 
-## 启动和测试
+## 启动与打包
+
+先启动本机 MySQL、创建 `springboot_study` 库，并在 `application-local.properties` 中配置密码，步骤见 [MYBATIS.md](MYBATIS.md)。数据库连接统一配置在 `src/main/resources/application.yml`，无需设置数据库 profile。Flyway 负责版本迁移；已有库首次接入需按该文档的“数据库版本迁移”步骤登记基线，以后正常启动即可。
 
 在仓库根目录的 PowerShell 终端执行：
 
@@ -42,28 +49,38 @@ cd .\springboot-study
 2. 如果右键菜单中没有该选项，打开右侧 **Maven** 工具窗口，点击 **关联 Maven 项目 / Link Maven Projects**（通常是加号），选择这个 POM。
 3. 等待 Maven 同步和索引完成，确认 Maven 窗口里同时出现 `learnJava` 和 `springboot-study`，再打开启动类。
 
-正确导入后，`src/main/java` 会被识别为源码目录，`src/main/resources` 为资源目录，`src/test/java` 为测试源码目录。优先通过 Maven 导入，让 IDEA 同时配置源码、依赖和 JDK。
+正确导入后，`src/main/java` 会被识别为源码目录，`src/main/resources` 为资源目录。优先通过 Maven 导入，让 IDEA 同时配置源码、依赖和 JDK。
 
 ```powershell
-# 自动化测试
-.\mvnw.cmd test
-
 # 打包并运行
 .\mvnw.cmd clean package
 java -jar .\target\springboot-study-1.0.0.jar
 ```
 
-macOS / Linux 可使用 `sh ./mvnw test` 或 `sh ./mvnw spring-boot:run`。
+macOS / Linux 可使用 `sh ./mvnw spring-boot:run` 启动应用。
 
-集成测试包含一个主动触发数据库溢出的用例，用来验证 500 兜底和事务回滚；运行时会出现该用例预期的 ERROR 堆栈，最终以 `Tests run: 20, Failures: 0, Errors: 0` 判断测试通过。
+## Swagger UI：在浏览器中调用接口
+
+启动或重启应用后，打开 [Swagger UI](http://127.0.0.1:8080/swagger-ui.html)。页面按“用户管理”“账户与转账”“登录演示”分组，接口和字段提供中文说明。
+
+| 操作 | 页面中的步骤 |
+| --- | --- |
+| 查看用户 | 展开“用户管理”中的 `GET /api/users`，点击 **Execute** |
+| 新增用户 | 展开 `POST /api/users`，修改示例 JSON，点击 **Execute**；成功返回 201 |
+| 查询、修改、删除 | 将新增响应的 `data.id` 填入对应接口的 `id` 输入框；修改时提交完整字段 |
+| 调用登录演示 | 点击 **Authorize**，输入 `demo-token`，再执行 `GET /api/secure/profile` |
+
+**Execute 会实际调用接口，新增、修改、删除会写入本机 MySQL。** 响应区会展示 HTTP 状态码和返回 JSON。用户名需要唯一，重复新增时修改示例中的 `userName`。
+
+页面由依赖提供，配置位于 `application.yml` 的 `springdoc` 段；`@Tag` 定义接口分组，`@Operation` 描述操作，`@Schema` 描述请求字段和示例。机器可读的接口文档为 [OpenAPI JSON](http://127.0.0.1:8080/v3/api-docs)。
 
 ## Actuator 监控与管理
 
-项目通过 `spring-boot-starter-actuator` 引入监控能力，无需自己编写 Controller。`application.yml` 开放了以下 HTTP 端点，启动后即可在浏览器或 [requests.http](requests.http) 中访问：
+项目通过 `spring-boot-starter-actuator` 引入监控能力，无需自己编写 Controller。`application.yml` 开放了以下 HTTP 端点，启动后即可在浏览器中访问：
 
 | 地址 | 用途 | 关注的内容 |
 | --- | --- | --- |
-| <http://127.0.0.1:8080/actuator/health> | 健康检查 | 总体 `status`，以及 `components.db` 中的 H2 数据库状态 |
+| <http://127.0.0.1:8080/actuator/health> | 健康检查 | 总体 `status`，以及 `components.db` 中的 MySQL 数据库状态 |
 | <http://127.0.0.1:8080/actuator/info> | 应用信息 | `info.app` 配置的名称和描述 |
 | <http://127.0.0.1:8080/actuator/metrics> | 指标目录 | `names` 中列出的 JVM、连接池和 HTTP 等指标 |
 | <http://127.0.0.1:8080/actuator/metrics/jvm.memory.used> | JVM 已用内存 | `measurements` 中的内存用量，单位为字节 |
@@ -75,46 +92,7 @@ macOS / Linux 可使用 `sh ./mvnw test` 或 `sh ./mvnw spring-boot:run`。
 
 若修改了应用端口，上述地址也要使用相同端口。引入依赖后，在 IDEA 中重新加载 Maven 项目并重启应用。
 
-## 先完成一次实验
-
-打开 [requests.http](requests.http)，在 IDEA HTTP Client 中按编号发送请求。若 IDEA 未提供 HTTP Client，也可以在应用启动后使用 PowerShell：
-
-```powershell
-# 1. 查询初始余额
-(Invoke-RestMethod http://127.0.0.1:8080/api/accounts).data | Format-Table
-
-# 2. 正常转账 1000 分，即 10 元
-$body = @{
-    fromAccountId = 1
-    toAccountId = 2
-    amountInCents = 1000
-    simulateFailure = $false
-} | ConvertTo-Json
-Invoke-RestMethod http://127.0.0.1:8080/api/transfers `
-    -Method Post -ContentType 'application/json' -Body $body
-
-# 3. 再次查询：小明 99000 分，小红 51000 分
-(Invoke-RestMethod http://127.0.0.1:8080/api/accounts).data | Format-Table
-
-# 4. 打开模拟失败开关。PowerShell 会因 HTTP 409 报错，这是本次实验的预期结果。
-$body = @{
-    fromAccountId = 1
-    toAccountId = 2
-    amountInCents = 1000
-    simulateFailure = $true
-} | ConvertTo-Json
-try {
-    Invoke-RestMethod http://127.0.0.1:8080/api/transfers `
-        -Method Post -ContentType 'application/json' -Body $body
-} catch {
-    $_.ErrorDetails.Message
-}
-
-# 5. 验证回滚：余额仍然为 99000 / 51000 分
-(Invoke-RestMethod http://127.0.0.1:8080/api/accounts).data | Format-Table
-```
-
-初始数据：小明（ID 1）100000 分，小红（ID 2）50000 分。请求执行次数会影响余额；重启应用可以恢复初始数据。H2 数据只存在于当前进程内，不会保存在磁盘上。
+首次初始化时：小明（ID 1）100000 分，小红（ID 2）50000 分。请求执行次数会影响余额；MySQL 持久保存数据，重启应用不会恢复初始余额。
 
 ## 接口及异常结果
 
@@ -230,7 +208,6 @@ Java 源码统一位于 `src/main/java/com/example/springstudy/`。
 | 7 | `exception/GlobalExceptionHandler.java` | 业务异常、校验异常、框架异常、500 兜底 |
 | 8 | `aspect/ApiLogAspect.java` | 切点、环绕通知、`proceed()`、耗时统计 |
 | 9 | `src/main/resources/` | 数据源配置、建表和初始数据 |
-| 10 | `src/test/java/.../AccountApiIntegrationTest.java` | 如何验证 HTTP 结果、真实提交和真实回滚 |
 
 ## 一次请求是怎样执行的
 
@@ -262,7 +239,7 @@ HTTP 请求 → Spring MVC 解析参数并校验
 | 为什么同类内部调用有坑？ | `this.xxx()` 不经过 Spring 代理，方法上的事务通知可能不会执行 |
 | 回滚后记录 ID 为什么可能跳号？ | 自增序列不保证回滚后重用；应检查记录是否存在，不能用 ID 连续性判断事务 |
 
-可以在 `transfer()` 的三次写入处、模拟异常处和全局处理器处打断点。再临时注释掉 `@Transactional`，执行模拟失败，观察余额和记录的变化；实验后恢复注解，测试应再次通过。
+可以在 `transfer()` 的三次写入处、模拟异常处和全局处理器处打断点，观察异常如何穿过事务代理到达全局异常处理器。
 
 本示例只演示单数据源事务。`simulateFailure` 是学习开关；真实资金系统还需要身份验证、权限控制、幂等、防重复提交和完整审计等设计。应用默认只监听本机地址。
 

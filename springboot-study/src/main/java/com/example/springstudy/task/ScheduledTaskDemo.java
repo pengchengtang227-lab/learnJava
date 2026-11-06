@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
  * 真实业务首先考虑幂等，例如只对仍未支付且已过期的订单执行条件更新；
  * 如需同一时刻只由一个实例执行，再考虑分布式锁或调度平台，不能依赖本机变量协调不同进程。
  */
-@Component
+//@Component
 public class ScheduledTaskDemo {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ScheduledTaskDemo.class);

@@ -1,5 +1,9 @@
 package com.example.springstudy;
 
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
+import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -17,6 +21,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @SpringBootApplication
 @EnableScheduling
+// 文档标题和认证方式直接声明在启动类上，无需再增加一个配置类。
+@OpenAPIDefinition(info = @Info(title = "Spring Boot 学习项目接口", version = "1.0.0",
+        description = "用户增删改查、账户转账和登录拦截器演示。展开接口、填写参数后点击 Execute。"))
+@SecurityScheme(name = "demoBearer", type = SecuritySchemeType.HTTP, scheme = "bearer",
+        description = "仅登录演示接口需要。点击 Authorize，填入 demo-token，无需手动添加 Bearer 前缀。")
 public class SpringStudyApplication {
 
     public static void main(String[] args) {

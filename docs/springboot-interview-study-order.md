@@ -11,7 +11,7 @@
 | 项目背景 | 当前情况 |
 |---|---|
 | 版本声明 | [springboot-study/pom.xml](../springboot-study/pom.xml) 声明 Spring Boot 4.1.2、Java 21 |
-| 技术栈 | Spring MVC、JDBC、H2，适合先练习请求处理和数据库访问 |
+| 技术栈 | Spring MVC、JDBC、MyBatis、本地 MySQL，可练习请求处理、数据库访问和事务 |
 | 已有示例 | 构造器注入、过滤器、拦截器、AOP、事务等 |
 | 后续练习 | 自定义配置绑定、定时任务、Runner、Redis、Actuator、异步、多数据源等，不能把建议练习当成已有实现 |
 
@@ -199,7 +199,7 @@ starter 主要聚合一组相关依赖；对应的自动配置由相关自动配
 - 可在 `ApplicationRunner` 中查询并预热缓存；如使用就绪事件监听器，需要考虑同步执行对启动耗时的影响。
 - 数据较多时分批查询和写入；考虑缓存键、过期策略、重复执行以及多实例同时预热。
 - 失败策略由业务决定：非关键缓存可记录失败并降级；服务必须依赖的数据可选择启动失败或保持未就绪，不能一概要求忽略失败。
-- **项目现状**：当前使用 H2，尚未引入 Redis。可先用 H2 练习查询，再接 Redis；题目原场景中的 MySQL 可在后续替换。
+- **项目现状**：当前使用本地 MySQL，已加入 MyBatis 用户 CRUD，尚未引入 Redis。可先练习数据库查询，再接 Redis 完成缓存预热。
 
 ### 15. 什么是 Spring Actuator？它有什么优势？【了解，原题 17】
 
@@ -215,7 +215,7 @@ starter 主要聚合一组相关依赖；对应的自动配置由相关自动配
 - `@SpringBootApplication` 组合了 `@SpringBootConfiguration`、`@EnableAutoConfiguration`、`@ComponentScan` 等注解。
 - 现代版本使用 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 声明自动配置候选类；这一机制在 2.7 引入，3.x 起不再通过 `spring.factories` 的旧入口注册自动配置类。不能推导为 `spring.factories` 文件已完全废弃。
 - 自动配置根据 `@ConditionalOnClass`、`@ConditionalOnMissingBean` 等条件决定是否生效；匹配缺失 Bean 条件的默认配置会在用户提供相应 Bean 时退让，不能概括成所有 Bean 都自动覆盖。
-- **掌握标准**：能串起“依赖与配置 → 候选自动配置 → 条件判断 → 注册 Bean”；用本项目的 JDBC/H2 数据源说明自动配置的结果。
+- **掌握标准**：能串起“依赖与配置 → 候选自动配置 → 条件判断 → 注册 Bean”；用本项目的 MySQL 数据源和 MyBatis Mapper 说明自动配置的结果。
 
 ### 17. Spring Boot 是如何通过 main 方法启动 Web 项目的？【熟悉，原题 4】
 

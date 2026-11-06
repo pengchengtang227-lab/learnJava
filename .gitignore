@@ -32,6 +32,9 @@ Desktop.ini
 !.env.sample
 !.env.template
 
+# MySQL 本机连接配置包含密码，仅留在本地。
+springboot-study/application-local.properties
+
 node_modules/
 .gitignore.invalid-backup/
 

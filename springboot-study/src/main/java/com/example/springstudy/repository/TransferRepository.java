@@ -26,7 +26,7 @@ public class TransferRepository {
                 .param("toId", request.toAccountId())
                 .param("amount", request.amountInCents())
                 .update(keyHolder, "id");
-        // H2 生成自增主键，KeyHolder 将主键带回 Java。
+        // MySQL 生成自增主键，KeyHolder 将主键带回 Java。
         return Objects.requireNonNull(keyHolder.getKey(), "转账记录主键未生成").longValue();
     }
 }

@@ -4,6 +4,7 @@ import com.example.springstudy.common.ApiResponse;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -31,6 +32,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         LOGGER.warn("业务请求未完成：code={}，message={}", exception.getCode(), exception.getMessage());
         return ResponseEntity.status(exception.getStatus())
                 .body(ApiResponse.failure(exception.getCode(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateKey(DuplicateKeyException exception) {
+        // 唯一索引才是防重复的最终保障；并发请求下仅靠“先查再插”仍可能冲突。
+        // 数据库原始异常可能包含 SQL 和参数，只返回稳定的业务提示。
+        LOGGER.warn("数据写入触发唯一约束冲突：{}", exception.getClass().getSimpleName());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.failure("DATA_CONFLICT", "唯一字段重复，请检查用户名是否已存在"));
     }
 
     @Override
