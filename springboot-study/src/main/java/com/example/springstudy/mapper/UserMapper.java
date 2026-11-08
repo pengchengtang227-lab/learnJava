@@ -24,4 +24,14 @@ public interface UserMapper {
     int updateUser(UserDO user);
 
     int deleteUser(@Param("id") Long userId);
+
+    /** 动态查询：精确姓名优先，否则用前缀；年龄条件可以独立组合。 */
+    List<UserDO> searchUsers(@Param("userName") String userName, @Param("namePrefix") String namePrefix,
+            @Param("age") Integer age);
+
+    /** foreach 的 collection="ids" 对应 @Param("ids")，而不是 Java 变量名 userIds。 */
+    List<UserDO> listUsersByIds(@Param("ids") List<Long> userIds);
+
+    /** 非 null 字段参与更新；返回影响行数，更新后的完整数据由 Service 再查询。 */
+    int updateUserSelective(UserDO user);
 }

@@ -1,5 +1,6 @@
 package com.example.springstudy.service;
 
+import com.example.springstudy.dto.PatchUserRequest;
 import com.example.springstudy.dto.SaveUserRequest;
 import com.example.springstudy.model.UserDO;
 import java.util.List;
@@ -17,4 +18,13 @@ public interface UserService {
     UserDO updateUser(Long userId, SaveUserRequest request);
 
     void removeUser(Long userId);
+
+    /** 动态 SQL 条件查询；姓名优先于前缀，年龄可独立组合。 */
+    List<UserDO> searchUsers(String userName, String namePrefix, Integer age);
+
+    /** 多个 ID 查询；null/空集合返回空结果。 */
+    List<UserDO> listUsersByIds(List<Long> userIds);
+
+    /** 部分更新；空请求返回 400，不存在返回 404，成功返回完整用户数据。 */
+    UserDO patchUser(Long userId, PatchUserRequest request);
 }

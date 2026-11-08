@@ -81,7 +81,7 @@
 | 用户不存在 | 404 / `USER_NOT_FOUND` |
 | 用户名违反唯一索引 | 409 / `DATA_CONFLICT` |
 
-数据库唯一约束负责并发情况下的最终防重复；`#{}` 参数绑定让输入作为数据传递。示例的 PUT 是完整字段更新，后续可继续练习动态 SQL 和分页。
+数据库唯一约束负责并发情况下的最终防重复；`#{}` 参数绑定让输入作为数据传递。PUT 是完整字段更新，第五节提供带 HTTP 接口的动态 SQL 示例，其中 PATCH 用于部分更新。
 
 更新先执行一次 `UPDATE`，通过返回的匹配行数判断用户是否存在，无需提前查询；成功后再执行一次 `SELECT`，返回包含数据库时间字段的完整用户数据。MySQL 连接显式设置 `useAffectedRows=false`，确保相同内容重复更新仍返回匹配行数。
 
@@ -134,3 +134,68 @@ ORDER BY installed_rank;
 | 8 | `src/main/resources/mapper/UserMapper.xml` | namespace/id、resultMap、#{}、主键回填、按 ID 更新和删除 |
 
 在 `insertUser` 前后设置断点，观察 `user.id` 从空值变为数据库生成的主键；再对照日志中的 SQL 与参数，理解 Mapper 接口如何调用 XML。
+
+## 五、动态 SQL：三个接口覆盖常用标签
+
+启动项目后，在 Swagger UI 中展开 **MyBatis 动态 SQL** 分组，填写参数并执行。控制台的 `Preparing` 展示带 `?` 的 SQL，`Parameters` 展示绑定的参数值。
+
+| 接口 | 使用的标签 | 示例 |
+| --- | --- | --- |
+| `GET /api/users/dynamic-sql/search` | `if`、`where`、`choose`、`when`、`otherwise`、`bind` | `?namePrefix=ali&age=20` |
+| `GET /api/users/dynamic-sql/by-ids` | `trim`、`foreach`，配合 `choose` 处理空集合 | `?ids=1,2,3` |
+| `PATCH /api/users/dynamic-sql/{id}` | `if`、`set` | 只提交 `{"email":"alice.new@example.com"}` |
+
+调用链为 `UserDynamicSqlController → UserServiceImpl → UserMapper → UserMapper.xml`。XML 中的三个例子包含标签说明；建议先看 HTTP 参数，再看 Mapper 的 `@Param`，最后对照 SQL。
+
+### 1. 条件查询：if / where / choose / bind
+
+以下路径都使用 GET，可直接放进浏览器或在 Swagger 中填写对应参数：
+
+```text
+/api/users/dynamic-sql/search?age=20
+/api/users/dynamic-sql/search?namePrefix=ali
+/api/users/dynamic-sql/search?namePrefix=ali&age=20
+/api/users/dynamic-sql/search?userName=alice&namePrefix=bob
+```
+
+- `if`：年龄非 null 时才加入年龄条件；数值 0 也有效。
+- `choose/when/otherwise`：有 `userName` 时精确查询；否则才考虑 `namePrefix`。两者都填时只使用精确姓名，不会在没查到记录后回退。
+- `bind`：把 `ali` 生成 `ali%`，再通过 `#{namePattern}` 绑定；SQL 仍是 `LIKE ?`。输入中的 `%`、`_` 保留 LIKE 通配符含义。
+- `where`：有条件才添加 WHERE，并删除开头的 AND/OR。所有参数都省略时查询全部用户。
+
+例如只传 `namePrefix=ali&age=20`，查询条件为 `WHERE user_name LIKE ? AND age = ?`，参数依次是 `ali%`、`20`。
+
+### 2. 多个 ID：trim / foreach
+
+```text
+/api/users/dynamic-sql/by-ids?ids=1,2,3
+```
+
+ID 请替换成已有用户的实际 ID，也支持 `?ids=1&ids=2`。每个 ID 必须为正数，一次最多 1000 项。省略或空列表返回空结果，不会查询全部用户。
+
+- `trim`：用 `prefix="WHERE"` 添加前缀，`prefixOverrides="AND |OR "` 去掉开头多余的 AND/OR，可以与第一个例子的 `where` 对照。
+- `foreach`：`collection="ids"` 对应 `@Param("ids")`；`item="id"` 是当前元素名，括号和分隔符由 `open/close/separator` 生成。
+
+三个 ID 生成 `WHERE id IN (?, ?, ?)`。直接调用 Mapper 时，null/空集合也会走 `WHERE 1 = 0` 分支。
+
+### 3. 部分更新：if / set
+
+在 Swagger 中选择 PATCH，填写实际用户 ID，请求体只保留要修改的字段，例如：
+
+```json
+{
+  "email": "alice.new@example.com"
+}
+```
+
+`if` 只加入非 null 字段；`set` 添加 SET 并删除末尾多余逗号。本次 SQL 结构为：
+
+```sql
+UPDATE study_user
+SET email = ?, gmt_modified = CURRENT_TIMESTAMP
+WHERE id = ?
+```
+
+用户名、年龄、性别和创建时间保留原值；返回值通过再次查询获得完整数据。省略字段或显式传 null 都表示“不修改”，不能通过此接口把字段清空为数据库 NULL。年龄和性别传 0 会正常更新。
+
+空请求 `{}`、非法字段返回 400；目标用户不存在返回 404；用户名重复返回 409。与原有 PUT 相比，PATCH 适合只改部分字段，PUT 仍要求提交完整可编辑字段。
