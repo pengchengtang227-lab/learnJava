@@ -7,6 +7,9 @@ import com.example.springstudy.exception.BusinessException;
 import com.example.springstudy.mapper.UserMapper;
 import com.example.springstudy.model.UserDO;
 import com.example.springstudy.service.UserService;
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -28,6 +31,7 @@ public class UserServiceImpl implements UserService {
 
     private static final int GENDER_UNKNOWN = 0;
     private static final int INSERT_GROUP_SIZE = 500;
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final UserMapper userMapper;
 
@@ -36,8 +40,24 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<UserDO> listUsers() {
-        return userMapper.listUsers();
+    public PageInfo<UserDO> listUsers(int pageNum, int pageSize) {
+        // Service 也校验边界，避免非 HTTP 调用传入 pageSize=0 绕过分页、一次读出全部用户。
+        if (pageNum < 1 || pageSize < 1 || pageSize > MAX_PAGE_SIZE) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "页码至少为 1，每页条数为 1～100");
+        }
+        // 当前插件以 int 相乘计算偏移量，先用 long 检查，避免超大页码溢出后查询到错误页面。
+        if (((long) pageNum - 1) * pageSize > Integer.MAX_VALUE) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "分页偏移量过大，请减小页码或每页条数");
+        }
+
+        // startPage 将分页参数暂存在当前线程；紧接着必须调用目标 Mapper，不能夹入其他查询。
+        // 插件自动查询总条数，并按 (pageNum - 1) * pageSize 计算偏移量，在 SQL 后追加 LIMIT。
+        // 退出 try 时自动调用 Page.close()，确保正常返回和异常时都清理线程中的分页状态。
+        try (Page<UserDO> ignored = PageHelper.startPage(pageNum, pageSize)) {
+            List<UserDO> users = userMapper.listUsers();
+            // 此处保留插件返回的分页 List；不要提前 stream().toList()，否则会丢失总条数等元数据。
+            return new PageInfo<>(users);
+        }
     }
 
     @Override

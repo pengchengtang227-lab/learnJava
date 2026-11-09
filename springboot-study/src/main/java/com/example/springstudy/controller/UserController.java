@@ -5,12 +5,14 @@ import com.example.springstudy.dto.BatchSaveUserRequest;
 import com.example.springstudy.dto.SaveUserRequest;
 import com.example.springstudy.model.UserDO;
 import com.example.springstudy.service.UserService;
+import com.github.pagehelper.PageInfo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
-import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,11 +41,22 @@ public class UserController {
         this.userService = userService;
     }
 
-    /** Read：查询列表；当前学习示例直接返回全部用户。 */
+    /**
+     * Read：查询一页用户。省略参数时查询第 1 页、每页 10 条；非法参数由 MVC 校验返回 400。
+     * data.list 是本页用户，data.total 是总记录数，data.pages 是总页数。
+     */
     @GetMapping
-    @Operation(summary = "查询用户列表", description = "按 ID 排序，当前示例返回全部用户。")
-    public ApiResponse<List<UserDO>> listUsers() {
-        return ApiResponse.success(userService.listUsers());
+    @Operation(summary = "分页查询用户列表：PageHelper",
+            description = "按 ID 升序；默认第 1 页、每页 10 条，最多 100 条。data.list 为用户列表，total 为总数，pages 为总页数。")
+    public ApiResponse<PageInfo<UserDO>> listUsers(
+            @Parameter(description = "页码，从 1 开始", example = "1")
+            @RequestParam(name = "pageNum", defaultValue = "1")
+            @Min(value = 1, message = "页码必须大于等于 1") int pageNum,
+            @Parameter(description = "每页条数，范围 1～100", example = "10")
+            @RequestParam(name = "pageSize", defaultValue = "10")
+            @Min(value = 1, message = "每页条数必须大于等于 1")
+            @Max(value = 100, message = "每页条数不能超过 100") int pageSize) {
+        return ApiResponse.success(userService.listUsers(pageNum, pageSize));
     }
 
     /** Read：路径中的 ID 必须为正数，不存在时返回 404。 */

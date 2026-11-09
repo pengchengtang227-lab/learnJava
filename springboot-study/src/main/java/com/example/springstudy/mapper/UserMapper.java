@@ -15,6 +15,7 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface UserMapper {
 
+    /** 普通列表 SQL；分页参数由 Service 的 PageHelper.startPage 设置，Mapper 不接收 offset。 */
     List<UserDO> listUsers();
 
     // @Param 明确 XML 的 #{id} 对应哪个参数，避免依赖编译器保留参数名。

@@ -130,7 +130,8 @@ class UserBatchInsertMyBatisTest {
         assertThrows(DuplicateKeyException.class, () -> userService.saveUsers(requests(501)));
         assertEquals(List.of(2_000, 4), counter.parameterCounts);
         assertEquals(1L, countUsers());
-        UserDO existing = userService.listUsers().get(0);
+        // 本用例只验证回滚后保留的原用户；直接按姓名查询，不依赖列表接口的分页响应结构。
+        UserDO existing = userService.searchUsers("batch-user-500", null, null).getFirst();
         assertEquals("batch-user-500", existing.getUserName());
         assertEquals("existing@example.com", existing.getEmail());
     }

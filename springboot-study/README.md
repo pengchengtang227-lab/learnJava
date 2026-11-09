@@ -4,6 +4,10 @@
 
 账户、转账记录和用户管理统一使用 MyBatis：Service 注入 Mapper 接口，SQL 放在 `src/main/resources/mapper/`。
 
+用户列表已接入 PageHelper，访问 `GET /api/users?pageNum=2&pageSize=10` 查询第 2 页；
+用户数组位于响应的 `data.list`，`data.total` 和 `data.pages` 分别是总人数和总页数。
+默认第 1 页、每页 10 条，最多每页 100 条；配置和源码说明见 [PageHelper 分页](MYBATIS.md#九pagehelper-用户列表分页)。
+
 批量新增用户可调用 `POST /api/users/batch`，一次最多 10000 条，每组 500 条通过 `foreach` 生成多行 INSERT，
 全部成功后统一提交；调用示例和代码说明见 [分组批量插入](MYBATIS.md#八分组--foreach-多行插入)。
 
@@ -23,6 +27,7 @@
 | JDBC、Validation、日志 | 由 Spring Boot 统一管理 | 避免依赖版本冲突 |
 | 数据库 | 本机 MySQL，驱动由 Spring Boot 管理 | 默认连接 springboot_study，重启保留数据 |
 | MyBatis | Starter 4.1.0，适配 Spring Boot 4.1 | 通过 Mapper 接口和 XML 完成账户查询、转账和用户 CRUD |
+| PageHelper | Starter 4.1.1，适配 Spring Boot 4.1 | 自动统计总数和生成 LIMIT，为用户列表提供物理分页 |
 | 数据库迁移 | Flyway，版本由 Spring Boot 管理 | 通过版本 SQL 管理初始化、字段和索引变更 |
 | 接口操作页面 | springdoc-openapi 3.2.0 + Swagger UI | 浏览器中直接查看和调用接口 |
 | Maven | Wrapper 固定为 3.9.16 | 本机无需预先安装 Maven，首次运行需要联网下载 |
@@ -60,6 +65,17 @@ cd .\springboot-study
 
 正确导入后，`src/main/java` 会被识别为源码目录，`src/main/resources` 为资源目录。优先通过 Maven 导入，让 IDEA 同时配置源码、依赖和 JDK。
 
+### 启动报错：找不到 JSqlParser 的 Expression 类
+
+如果 `PageHelperAutoConfiguration` 初始化报 `NoClassDefFoundError: net/sf/jsqlparser/expression/Expression`，
+说明本次启动的运行类路径缺少 SQL 解析器。当前项目使用的 `pagehelper:6.1.1` 会通过其发布 POM
+传递引入 `com.github.jsqlparser:jsqlparser:4.7`，因此不需要在业务项目中重复声明。
+在 IDEA 右侧 Maven 窗口点击“重新加载所有 Maven 项目”，等待同步完成后重新运行 `SpringStudyApplication`。
+不要只点击 Java 编译或重复运行旧配置；增加 Maven 依赖后，IDEA 的运行类路径也需要刷新。
+
+可以在本目录执行 `.\mvnw.cmd dependency:tree "-Dincludes=com.github.jsqlparser:jsqlparser"` 核对依赖，
+或用 `.\mvnw.cmd spring-boot:run` 按 Maven 的完整类路径启动。
+
 ```powershell
 # 打包并运行
 .\mvnw.cmd clean package
@@ -74,7 +90,7 @@ macOS / Linux 可使用 `sh ./mvnw spring-boot:run` 启动应用。
 
 | 操作 | 页面中的步骤 |
 | --- | --- |
-| 查看用户 | 展开“用户管理”中的 `GET /api/users`，点击 **Execute** |
+| 查看用户 | 展开“用户管理”中的 `GET /api/users`，填写 pageNum、pageSize，点击 **Execute**；列表在 data.list |
 | 新增用户 | 展开 `POST /api/users`，修改示例 JSON，点击 **Execute**；成功返回 201 |
 | 查询、修改、删除 | 将新增响应的 `data.id` 填入对应接口的 `id` 输入框；修改时提交完整字段 |
 | 调用登录演示 | 点击 **Authorize**，输入 `demo-token`，再执行 `GET /api/secure/profile` |

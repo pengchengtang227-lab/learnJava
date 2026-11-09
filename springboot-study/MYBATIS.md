@@ -58,7 +58,7 @@
 | --- | --- | --- |
 | 新增 | `POST /api/users` | 201，返回用户、自增 ID 和数据库时间 |
 | 批量新增 | `POST /api/users/batch` | 201，`data` 返回插入数量，每组最多 500 条，全部成功才提交 |
-| 查询列表 | `GET /api/users` | 200，按 ID 排序；本例返回全部用户 |
+| 分页列表 | `GET /api/users?pageNum=1&pageSize=10` | 200，按 ID 升序；`data.list` 是当前页，`data.total` 是总人数 |
 | 查询详情 | `GET /api/users/{id}` | 200；用户不存在则 404 |
 | 修改 | `PUT /api/users/{id}` | 200，返回更新后的完整用户数据；需提交完整的可编辑字段；用户不存在则 404 |
 | 删除 | `DELETE /api/users/{id}` | 200，`data` 为 null；重复删除为 404 |
@@ -128,7 +128,7 @@ ORDER BY installed_rank;
 
 | 顺序 | 文件 | 重点 |
 | --- | --- | --- |
-| 1 | `pom.xml`、`src/main/resources/application.yml` | MyBatis、Flyway、MySQL 驱动与连接配置 |
+| 1 | `pom.xml`、`src/main/resources/application.yml` | MyBatis、PageHelper、Flyway、MySQL 驱动与连接配置 |
 | 2 | `src/main/resources/db/migration/V1__init_schema_and_demo_accounts.sql`、`V2__add_user_gender_and_email_index.sql` | 初始结构、演示数据、字段与索引的版本变更 |
 | 3 | `src/main/java/com/example/springstudy/model/UserDO.java` | JavaBean、字段映射、为何需要 setter 回填 ID |
 | 4 | `src/main/java/com/example/springstudy/dto/SaveUserRequest.java` | 请求字段与校验约束 |
@@ -425,3 +425,86 @@ Mapper 接口的 `@Param("users")` 与 XML 中的 `collection="users"` 对应：
 非法列表、字段返回 400；用户名重复返回 409，均不留下部分导入的数据。
 
 运行 `.\mvnw.cmd test` 可验证分组边界、实际 SQL 次数、字段映射、嵌套参数校验和跨组失败回滚。
+
+## 九、PageHelper 用户列表分页
+
+用户列表已由一次返回全部用户改为数据库分页，仍调用 `GET /api/users`：
+
+| 请求 | 含义 |
+| --- | --- |
+| `/api/users` | 默认第 1 页，每页 10 条 |
+| `/api/users?pageNum=2&pageSize=10` | 第 2 页，每页 10 条 |
+| `/api/users?pageNum=3&pageSize=20` | 第 3 页，每页 20 条 |
+
+`pageNum` 至少为 1，`pageSize` 范围是 1～100；类型错误、参数越界或偏移量超出当前插件可安全计算的范围时，
+返回 HTTP 400 和 `INVALID_REQUEST`。页码超过总页数时返回空列表，并保留请求页码及正确总数，不跳回最后一页。
+
+响应继续使用 `ApiResponse`，但 `data` 从用户数组改为 `PageInfo<UserDO>` 对象。
+以下仅展示分页元数据（用户列表 `list` 和其他字段已省略），具体人数以实际数据库为准：
+
+```json
+{
+  "code": "SUCCESS",
+  "message": "操作成功",
+  "data": {
+    "pageNum": 2,
+    "pageSize": 10,
+    "size": 10,
+    "total": 104,
+    "pages": 11,
+    "hasPreviousPage": true,
+    "hasNextPage": true
+  }
+}
+```
+
+实际响应的 `data.list` 中有 10 个完整的 `UserDO` 对象。调用方原来读取 `data` 数组，现在应改为读取 `data.list`。
+其他单条新增、批量新增、详情、动态 SQL 和关联查询的响应结构不受这次列表分页影响。
+
+### 1. 从配置到 SQL 的调用流程
+
+| 文件 | 本次调整及原因 |
+| --- | --- |
+| `pom.xml` | 引入 PageHelper Starter 4.1.1，与项目 Spring Boot 4.1 配套；自动注册分页拦截器 |
+| `application.yml` | 指定 MySQL 方言，关闭超范围页码自动修正和 pageSize=0 查询全部的行为 |
+| `UserController` | 接收 `pageNum`、`pageSize`，设置默认值、参数校验和 Swagger 中文说明 |
+| `UserService`、`UserServiceImpl` | 列表方法接收分页参数，返回 `PageInfo<UserDO>`；查询前设置分页，查询后封装元数据并清理线程状态 |
+| `UserMapper`、XML 的 `listUsers` | 仍使用普通 SELECT，保留 `ORDER BY id`，仅补充注释，不手写 LIMIT |
+| `UserDO`、数据库表 | 不需要为分页改变实体字段或表结构 |
+
+核心代码位于 `UserServiceImpl.listUsers`，参数校验后执行：
+
+```java
+try (Page<UserDO> page = PageHelper.startPage(pageNum, pageSize)) {
+    List<UserDO> users = userMapper.listUsers();
+    return new PageInfo<>(users);
+}
+```
+
+`startPage` 将分页参数放到当前线程，紧接着的第一个 MyBatis 查询应用分页，
+因此不要在它与目标 Mapper 调用之间插入其他数据库查询。`Page` 需要导入 `com.github.pagehelper.Page`，
+它实现了 `AutoCloseable`；退出 `try` 时会自动调用 `Page.close()`，内部执行 `PageHelper.clearPage()`，
+确保正常返回和异常退出时都清理分页状态。
+不要先把返回列表转换为普通 List 再构造 PageInfo，否则会丢失插件保存的总数等信息。
+
+### 2. 在日志里观察 COUNT 和 LIMIT
+
+访问 `/api/users?pageNum=2&pageSize=10`，通常会看到两次查询：
+
+```sql
+-- 插件生成的总数查询，MyBatis 日志名通常以 listUsers_COUNT 结尾。
+SELECT count(0) FROM study_user;
+
+-- 当前页查询，偏移量 (2 - 1) * 10 = 10。
+SELECT id, user_name, age, email, gender, gmt_create, gmt_modified
+FROM study_user
+ORDER BY id
+LIMIT 10, 10;
+```
+
+日志中实际是 `LIMIT ?, ?`，参数通过 JDBC 绑定；第一页可能简化为 `LIMIT ?`。
+总数为 0 或页码已经超范围时，插件可以跳过列表查询。分页针对单表用户列表，
+不要直接套到一对多 JOIN 的平铺结果上，否则可能把同一个用户的多条订单截断。
+
+运行 `.\mvnw.cmd test`，`UserPaginationIntegrationTest` 会以真实 Boot 自动配置和独立 H2 库验证
+首页、后续页、末页、空表、超范围页码、参数校验、Swagger，以及成功/异常后线程分页状态清理。

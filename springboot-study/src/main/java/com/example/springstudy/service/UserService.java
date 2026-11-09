@@ -3,12 +3,14 @@ package com.example.springstudy.service;
 import com.example.springstudy.dto.PatchUserRequest;
 import com.example.springstudy.dto.SaveUserRequest;
 import com.example.springstudy.model.UserDO;
+import com.github.pagehelper.PageInfo;
 import java.util.List;
 
 /** 用户 CRUD 业务接口；Controller 依赖此接口，不直接操作 Mapper。 */
 public interface UserService {
 
-    List<UserDO> listUsers();
+    /** 分页查询用户，返回本页列表和总条数；页码从 1 开始，每页 1～100 条。 */
+    PageInfo<UserDO> listUsers(int pageNum, int pageSize);
 
     UserDO getUser(Long userId);
 

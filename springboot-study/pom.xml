@@ -22,6 +22,8 @@
         <java.version>21</java.version>
         <!-- 4.1.x Starter 适配 Spring Boot 4.1，避免使用面向 Boot 3 的 3.x Starter。 -->
         <mybatis-spring-boot.version>4.1.0</mybatis-spring-boot.version>
+        <!-- PageHelper 4.1.x Starter 适配 Spring Boot 4.1，分页时自动追加 COUNT 和 LIMIT。 -->
+        <pagehelper-spring-boot.version>4.1.1</pagehelper-spring-boot.version>
         <!-- springdoc 3.2.0 使用 Spring Boot 4.1.2，可直接提供 Swagger UI 页面。 -->
         <springdoc-openapi.version>3.2.0</springdoc-openapi.version>
     </properties>
@@ -74,6 +76,12 @@
             <groupId>org.mybatis.spring.boot</groupId>
             <artifactId>mybatis-spring-boot-starter</artifactId>
             <version>${mybatis-spring-boot.version}</version>
+        </dependency>
+        <!-- 自动向 MyBatis 注册分页拦截器；Mapper XML 继续写普通 SELECT。 -->
+        <dependency>
+            <groupId>com.github.pagehelper</groupId>
+            <artifactId>pagehelper-spring-boot-starter</artifactId>
+            <version>${pagehelper-spring-boot.version}</version>
         </dependency>
         <!-- 只在运行时需要 MySQL JDBC 驱动，版本交给 Spring Boot 管理。 -->
         <dependency>

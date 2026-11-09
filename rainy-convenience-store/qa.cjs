@@ -1,0 +1,25 @@
+const fs=require('fs');
+(async()=>{
+const tabs=await(await fetch('http://127.0.0.1:9225/json')).json(),target=tabs.find(t=>t.type==='page');
+const w=new WebSocket(target.webSocketDebuggerUrl);let id=0;const errors=[];
+w.addEventListener('message',e=>{const x=JSON.parse(e.data);if(x.method==='Runtime.exceptionThrown')errors.push(x.params.exceptionDetails.exception?.description||x.params.exceptionDetails.text)});
+const send=(method,params={})=>new Promise((resolve,reject)=>{const i=++id;const timeout=setTimeout(()=>reject(new Error('timeout '+method)),20000);const f=e=>{const x=JSON.parse(e.data);if(x.id===i){clearTimeout(timeout);w.removeEventListener('message',f);resolve(x)}};w.addEventListener('message',f);w.send(JSON.stringify({id:i,method,params}))});
+await new Promise(r=>w.addEventListener('open',r,{once:true}));await send('Page.enable');await send('Runtime.enable');
+await send('Emulation.setDeviceMetricsOverride',{width:1500,height:1050,deviceScaleFactor:1,mobile:false});
+await send('Page.navigate',{url:'file:///C:/Users/12289/Desktop/%E9%9B%A8%E5%A4%9C%E4%BE%BF%E5%88%A9%E5%BA%97%E8%A1%97%E8%A7%92%E5%BE%AE%E7%BC%A9%E5%9C%BA%E6%99%AF/index.html'});
+await new Promise(r=>setTimeout(r,5000));
+const evalJS=async expression=>{const x=await send('Runtime.evaluate',{expression,returnByValue:true});return x.result?.result?.value||x.result?.exceptionDetails};
+console.log('runtime',await evalJS(`JSON.stringify({ready:!!window.__diorama,body:document.body.innerText,canvas:[innerWidth,innerHeight],status:window.__sceneStatus,camera:window.__diorama?.camera.position.toArray(),render:window.__diorama?.renderer.info.render})`));
+const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(__dirname+'/preview.png',Buffer.from(shot.result.data,'base64'));
+const before=await evalJS(`JSON.stringify({p:__diorama.camera.position.toArray(),zoom:__diorama.camera.zoom,rain:__diorama.rain.geometry.attributes.position.array[1]})`);
+await send('Input.dispatchMouseEvent',{type:'mousePressed',x:750,y:520,button:'left',buttons:1,clickCount:1});
+await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:930,y:540,button:'left',buttons:1});
+await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:930,y:540,button:'left',buttons:0});
+await send('Input.dispatchMouseEvent',{type:'mouseWheel',x:750,y:520,deltaX:0,deltaY:-240});await new Promise(r=>setTimeout(r,1500));
+const after=await evalJS(`JSON.stringify({p:__diorama.camera.position.toArray(),zoom:__diorama.camera.zoom,rain:__diorama.rain.geometry.attributes.position.array[1]})`);
+console.log('before',before);console.log('after',after);console.log('errors',JSON.stringify(errors));
+console.log('desktop',await evalJS(`JSON.stringify({path:location.pathname,reflector:__diorama.scene.children.some(o=>o.isReflector),door:[__diorama.leftDoor.position.x,__diorama.rightDoor.position.x],ripples:__diorama.rings.length})`));
+await new Promise(r=>setTimeout(r,2500));console.log('door animation',await evalJS(`JSON.stringify([__diorama.leftDoor.position.x,__diorama.rightDoor.position.x])`));
+await send('Browser.close');
+w.close();
+})().catch(e=>{console.error(e);process.exitCode=1});

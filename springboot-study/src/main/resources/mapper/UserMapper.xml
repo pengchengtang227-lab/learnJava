@@ -137,6 +137,10 @@
         ORDER BY id
     </select>
 
+    <!--
+        PageHelper 在执行时自动生成 COUNT 和 LIMIT，不要在这里再手写 LIMIT，以免重复分页。
+        ORDER BY id 提供确定顺序；Service 未调用 startPage 时，这条 SQL 本身仍是普通列表查询。
+    -->
     <select id="listUsers" resultMap="userResultMap">
         SELECT <include refid="userColumns"/>
         FROM study_user

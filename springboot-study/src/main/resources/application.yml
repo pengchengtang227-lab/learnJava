@@ -35,6 +35,17 @@ mybatis:
   # 注册类型别名后，Mapper XML 中可直接使用 UserDO，无需写全限定类名。
   type-aliases-package: com.example.springstudy.model
 
+# Starter 自动注册 PageInterceptor；仅在 Service 调用 startPage 后的查询上分页。
+pagehelper:
+  # 当前数据库是 MySQL，插件会将普通 SELECT 改写为带 LIMIT 的物理分页 SQL。
+  helper-dialect: mysql
+  # 超出总页数时返回空列表，保留请求页码，不自动跳回最后一页。
+  reasonable: false
+  # 不允许通过 pageSize=0 查询全部；接口另外限制每页 1～100 条。
+  page-size-zero: false
+  # 由 startPage 显式控制分页，避免普通 Mapper 参数意外触发分页。
+  support-methods-arguments: false
+
 # 启动后访问 /swagger-ui.html，在浏览器中填写参数并调用接口。
 springdoc:
   # 仅展示本项目的业务接口，避免将框架提供的端点混入列表。
