@@ -3,12 +3,14 @@ package com.example.springstudy.service.impl;
 import com.example.springstudy.dto.TransferRequest;
 import com.example.springstudy.dto.TransferVO;
 import com.example.springstudy.exception.BusinessException;
+import com.example.springstudy.mapper.AccountMapper;
+import com.example.springstudy.mapper.TransferMapper;
 import com.example.springstudy.model.AccountDO;
-import com.example.springstudy.repository.AccountRepository;
-import com.example.springstudy.repository.TransferRepository;
+import com.example.springstudy.model.TransferRecordDO;
 import com.example.springstudy.service.AccountService;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,23 +19,23 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AccountServiceImpl implements AccountService {
 
-    private final AccountRepository accountRepository;
-    private final TransferRepository transferRepository;
+    private final AccountMapper accountMapper;
+    private final TransferMapper transferMapper;
 
-    // 只有一个构造器时无需 @Autowired，Spring 自动注入两个 Repository Bean。
-    public AccountServiceImpl(AccountRepository accountRepository, TransferRepository transferRepository) {
-        this.accountRepository = accountRepository;
-        this.transferRepository = transferRepository;
+    // 只有一个构造器时无需 @Autowired，Spring 自动注入两个 MyBatis Mapper 代理。
+    public AccountServiceImpl(AccountMapper accountMapper, TransferMapper transferMapper) {
+        this.accountMapper = accountMapper;
+        this.transferMapper = transferMapper;
     }
 
     @Override
     public List<AccountDO> listAccounts() {
-        return accountRepository.listAccounts();
+        return accountMapper.listAccounts();
     }
 
     @Override
     public AccountDO getAccount(Long accountId) {
-        return accountRepository.findById(accountId)
+        return Optional.ofNullable(accountMapper.getAccountById(accountId))
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
                         "ACCOUNT_NOT_FOUND", "账户不存在：" + accountId));
     }
@@ -55,13 +57,18 @@ public class AccountServiceImpl implements AccountService {
         getAccount(request.toAccountId());
 
         // 下列三次写入参与同一个事务：扣款、入账、保存转账记录。
-        if (!accountRepository.deductBalance(request.fromAccountId(), request.amountInCents())) {
+        if (accountMapper.deductBalance(request.fromAccountId(), request.amountInCents()) == 0) {
             throw new BusinessException(HttpStatus.CONFLICT, "INSUFFICIENT_BALANCE", "账户余额不足");
         }
-        if (!accountRepository.addBalance(request.toAccountId(), request.amountInCents())) {
+        if (accountMapper.addBalance(request.toAccountId(), request.amountInCents()) == 0) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "转入账户不存在");
         }
-        Long transferId = transferRepository.saveTransfer(request);
+        TransferRecordDO transferRecord = new TransferRecordDO();
+        transferRecord.setFromAccountId(request.fromAccountId());
+        transferRecord.setToAccountId(request.toAccountId());
+        transferRecord.setAmountInCents(request.amountInCents());
+        transferMapper.insertTransfer(transferRecord);
+        Long transferId = Objects.requireNonNull(transferRecord.getId(), "转账记录主键未生成");
 
         // 此时 SQL 已执行，但还没有提交。主动失败用于验证三次写入能否一起撤销。
         if (Boolean.TRUE.equals(request.simulateFailure())) {

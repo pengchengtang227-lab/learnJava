@@ -5,7 +5,7 @@
 
     <!-- 显式映射数据库列到 JavaBean 属性，解决 user_name 与 userName 等命名差异。
      如果property 没匹配就会出错-->
-    <resultMap id="userResultMap" type="com.example.springstudy.model.UserDO">
+    <resultMap id="userResultMap" type="UserDO">
         <id column="id" property="id"/>
         <result column="user_name" property="userName"/>
         <result column="age" property="age"/>
@@ -15,10 +15,127 @@
         <result column="gmt_modified" property="gmtModified"/>
     </resultMap>
 
+    <!--
+        GET /api/users/{id}/relations：一个用户 + 一份资料 + 多个订单。
+        type/javaType/ofType 使用 application.yml 扫描注册的类型别名。
+        主对象和子对象的 id 用于识别同一对象，将 SQL 的多行结果合并。
+        嵌套结果映射
+    -->
+    <resultMap id="userRelationsMap" type="UserDO" autoMapping="false">
+        <id column="user_id" property="id"/>
+        <result column="user_name" property="userName"/>
+        <result column="age" property="age"/>
+        <result column="email" property="email"/>
+        <result column="gender" property="gender"/>
+        <result column="gmt_create" property="gmtCreate"/>
+        <result column="gmt_modified" property="gmtModified"/>
+
+        <!-- association：property 是单个 UserProfileDO；没有资料时为 null。 -->
+        <association property="profile" javaType="UserProfileDO" notNullColumn="profile_id">
+            <id column="profile_id" property="id"/>
+            <result column="nickname" property="nickname"/>
+            <result column="city" property="city"/>
+        </association>
+
+        <!-- collection：property 是 List，ofType 指集合元素类型；没有订单时为空列表。 -->
+        <collection property="orders" ofType="UserOrderDO" notNullColumn="order_id">
+            <id column="order_id" property="id"/>
+            <result column="order_no" property="orderNo"/>
+            <!-- 内置 EnumTypeHandler 按枚举名称映射 VARCHAR，不使用 ordinal 序号。 -->
+            <result column="status" property="status"
+                    typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+            <result column="amount_in_cents" property="amountInCents"/>
+        </collection>
+    </resultMap>
+
+    <!-- 一次联表查询，不使用嵌套 select；同一个用户的多行订单由 resultMap 组装。 嵌套结果映射-->
+    <select id="getUserRelations" resultMap="userRelationsMap">
+        SELECT u.id AS user_id,
+               u.user_name,
+               u.age,
+               u.email,
+               u.gender,
+               u.gmt_create,
+               u.gmt_modified,
+               p.id AS profile_id,
+               p.nickname,
+               p.city,
+               o.id AS order_id,
+               o.order_no,
+               o.status,
+               o.amount_in_cents
+        FROM study_user AS u
+        LEFT JOIN study_user_profile AS p ON p.user_id = u.id
+        LEFT JOIN study_user_order AS o ON o.user_id = u.id
+        WHERE u.id = #{id}
+        ORDER BY o.id
+    </select>
+
     <!-- 查询列显式列举；sql + include 用于复用相同的字段清单。 -->
     <sql id="userColumns">
         id, user_name, age, email, gender, gmt_create, gmt_modified
     </sql>
+
+    <!--
+        嵌套查询（Nested Select）：GET /api/users/{id}/relations/nested-select。
+        extends 复用 userResultMap 的用户基础字段映射，再补充两个关联属性。
+        与上面的 JOIN 不同：主 SQL 只查 study_user，关联属性通过 select 调用其他 SQL。
+        本例 fetchType="eager" 立即加载，便于在日志中观察查询；不是延迟加载示例。
+    -->
+    <resultMap id="userNestedSelectMap" type="UserDO" extends="userResultMap" autoMapping="false">
+        <!--
+            column="{userId=id}"：右侧 id 是主查询返回的列名，左侧 userId 是子查询的参数名。
+            例如用户 id=1，MyBatis 会把 userId=1 传给 getUserProfileByUserId，结果填入 profile。
+            select 指向同一个 Mapper XML 的语句 id，无需在 Service 中手动调用。
+        -->
+        <association property="profile" javaType="UserProfileDO"
+                     column="{userId=id}" select="getUserProfileByUserId" fetchType="eager"/>
+
+        <!-- 同样传入用户 ID；子查询返回的多条订单会填入 orders 集合，ofType 是元素类型。 -->
+        <collection property="orders" ofType="UserOrderDO"
+                    column="{userId=id}" select="listUserOrdersByUserId" fetchType="eager"/>
+    </resultMap>
+
+    <!-- 子查询有自己的 resultMap，只负责把资料表的行映射为资料对象。 -->
+    <resultMap id="userProfileResultMap" type="UserProfileDO" autoMapping="false">
+        <id column="id" property="id"/>
+        <result column="nickname" property="nickname"/>
+        <result column="city" property="city"/>
+    </resultMap>
+
+    <resultMap id="userOrderResultMap" type="UserOrderDO" autoMapping="false">
+        <id column="id" property="id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="status" property="status"
+                typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result column="amount_in_cents" property="amountInCents"/>
+    </resultMap>
+
+    <!--
+        第 1 次查询：只查用户，userNestedSelectMap 随后触发下面两个子查询。
+        用户存在且无缓存命中时共 3 次 SQL；用户不存在时不触发子查询，由 Service 返回 404。
+        若改为查 N 个用户，并加载每人的两种关联，可能执行 1 + 2N 次 SQL，这就是 N+1 类问题。
+    -->
+    <select id="getUserRelationsByNestedSelect" resultMap="userNestedSelectMap">
+        SELECT <include refid="userColumns"/>
+        FROM study_user
+        WHERE id = #{id}
+    </select>
+
+    <!-- 第 2 次查询：#{userId} 来自 association 的 column；没有资料时 profile 为 null。 -->
+    <select id="getUserProfileByUserId" resultMap="userProfileResultMap">
+        SELECT id, nickname, city
+        FROM study_user_profile
+        WHERE user_id = #{userId}
+    </select>
+
+    <!-- 第 3 次查询：#{userId} 来自 collection 的 column；没有订单时 orders 为 []。 -->
+    <select id="listUserOrdersByUserId" resultMap="userOrderResultMap">
+        SELECT id, order_no, status, amount_in_cents
+        FROM study_user_order
+        WHERE user_id = #{userId}
+        ORDER BY id
+    </select>
 
     <select id="listUsers" resultMap="userResultMap">
         SELECT <include refid="userColumns"/>
@@ -28,7 +145,7 @@
 
     <!-- #{} 生成 JDBC 占位符并绑定值，用户输入不会作为 SQL 文本拼接。
     as 之后 如果名字和Java对象属性没对应上，不会报错 -->
-    <select id="getUserById" resultType="com.example.springstudy.model.UserDO">
+    <select id="getUserById" resultType="UserDO">
         SELECT id,
         user_name as userName,
         age,
@@ -60,6 +177,14 @@
     <!-- 本例演示物理删除。缺少 ID 的请求会先在 Controller 被校验拦截。 -->
     <delete id="deleteUser">
         DELETE FROM study_user WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteUserProfile">
+        DELETE FROM study_user_profile WHERE user_id = #{id}
+    </delete>
+
+    <delete id="deleteUserOrders">
+        DELETE FROM study_user_order WHERE user_id = #{id}
     </delete>
 
     <!--

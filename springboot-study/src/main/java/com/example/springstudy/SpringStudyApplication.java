@@ -10,7 +10,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 启动入口。@SpringBootApplication 开启自动配置，并扫描当前包及子包中的 Spring 组件。
- * Controller、Service、Repository 和日志切面都放在此包下面，因此能被自动发现。
+ * Controller、Service 和日志切面由组件扫描发现；子包中的 @Mapper 接口由 MyBatis Starter 扫描。
  * @EnableScheduling 开启定时任务，Spring 会自动处理任务 Bean 中的 @Scheduled 方法。
  *
  * <p>Spring MVC 的核心是 DispatcherServlet，它是所有请求的统一入口。请求进来后，它先通过 HandlerMapping 根据 URL 找到对应的 Controller 方法和拦截器，组成执行链；

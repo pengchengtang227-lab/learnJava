@@ -2,7 +2,13 @@
 
 这是当前 Java 练习仓库中的独立 Maven 项目，通过一个转账流程串起 HTTP 接口、依赖注入、参数校验、数据库事务、全局异常处理和 AOP 日志。代码包含中文注释，建议按下方阅读顺序学习。
 
+账户、转账记录和用户管理统一使用 MyBatis：Service 注入 Mapper 接口，SQL 放在 `src/main/resources/mapper/`。
+
 新增的 **MyBatis 用户 CRUD + 本地 MySQL** 示例见 [MYBATIS.md](MYBATIS.md)，包含连接配置、启动步骤、接口示例和源码阅读顺序。应用默认连接本机 MySQL，数据持久保存，直接运行启动类即可。
+
+学习 `association` 和 `collection` 可看 [关联查询示例](MYBATIS.md#六关联查询association--collection)：一个用户关联一份资料和多个订单，重启后在 Swagger 的“MyBatis 关联查询”分组调用 `GET /api/users/{id}/relations`。
+
+同一分组还提供 `GET /api/users/{id}/relations/nested-select`，通过嵌套查询分别加载用户、资料和订单，可对照 JOIN 接口的结果及 SQL 次数；详见 [嵌套查询说明](MYBATIS.md#七嵌套查询nested-select)。
 
 ## 技术版本与环境
 
@@ -13,7 +19,7 @@
 | Spring Framework | 7.0.10，由 Spring Boot 管理 | 避免手工组合 Spring 组件版本 |
 | JDBC、Validation、日志 | 由 Spring Boot 统一管理 | 避免依赖版本冲突 |
 | 数据库 | 本机 MySQL，驱动由 Spring Boot 管理 | 默认连接 springboot_study，重启保留数据 |
-| MyBatis | Starter 4.1.0，适配 Spring Boot 4.1 | 通过 Mapper 接口和 XML 完成用户 CRUD |
+| MyBatis | Starter 4.1.0，适配 Spring Boot 4.1 | 通过 Mapper 接口和 XML 完成账户查询、转账和用户 CRUD |
 | 数据库迁移 | Flyway，版本由 Spring Boot 管理 | 通过版本 SQL 管理初始化、字段和索引变更 |
 | 接口操作页面 | springdoc-openapi 3.2.0 + Swagger UI | 浏览器中直接查看和调用接口 |
 | Maven | Wrapper 固定为 3.9.16 | 本机无需预先安装 Maven，首次运行需要联网下载 |
@@ -204,7 +210,7 @@ Java 源码统一位于 `src/main/java/com/example/springstudy/`。
 | 3 | `dto/TransferRequest.java` | 请求对象和 Jakarta Validation 字段约束 |
 | 4 | `service/AccountService.java` | 接口与实现分离，Controller 依赖业务接口 |
 | 5 | `service/impl/AccountServiceImpl.java` | 三次数据库写入、事务边界和回滚 |
-| 6 | `repository/AccountRepository.java`、`TransferRepository.java` | 参数化 SQL、更新行数、数据库主键 |
+| 6 | `mapper/AccountMapper.java`、`TransferMapper.java` 及对应 XML | record 构造器映射、条件扣款、更新行数和自增主键回填 |
 | 7 | `exception/GlobalExceptionHandler.java` | 业务异常、校验异常、框架异常、500 兜底 |
 | 8 | `aspect/ApiLogAspect.java` | 切点、环绕通知、`proceed()`、耗时统计 |
 | 9 | `src/main/resources/` | 数据源配置、建表和初始数据 |
@@ -225,6 +231,10 @@ HTTP 请求 → Spring MVC 解析参数并校验
          → 正常结果由 MVC 输出；异常由 GlobalExceptionHandler 转成 JSON
 ```
 
+三次写入依次调用 `AccountMapper.deductBalance`、`AccountMapper.addBalance`、`TransferMapper.insertTransfer`。
+`AccountDO` 保持不可变 record，通过 XML 的 `<constructor>` 映射查询结果；
+`TransferRecordDO` 使用可变 JavaBean，数据库生成的主键通过 `useGeneratedKeys` 回填到 `id`，再组成原有 `TransferVO` 响应。
+
 参数绑定和校验发生在调用 Controller 之前，因此这类错误可能没有 Controller 的 AOP 日志。这一切面统计的是方法执行情况，`正常返回=false` 表示方法抛出了异常，不能直接当作 HTTP 状态码。
 
 ## 关于事务，重点观察这些地方
@@ -232,7 +242,7 @@ HTTP 请求 → Spring MVC 解析参数并校验
 | 问题 | 本示例中的答案 |
 | --- | --- |
 | 为什么放在 Service？ | 一次业务涉及扣款、入账和写记录，必须一起提交或撤销 |
-| 为什么两个 Repository 能共享事务？ | 它们使用同一个数据源；Spring 将事务连接与当前调用线程关联 |
+| 为什么两个 Mapper 能共享事务？ | MyBatis-Spring 使用同一数据源，加入 Service 的 Spring 事务，并复用事务中的数据库连接 |
 | 默认哪些异常会回滚？ | `RuntimeException` 和 `Error`；本例通过 `rollbackFor = Exception.class` 包含受检异常 |
 | 全局处理器会不会阻止回滚？ | 异常先穿过事务代理完成回滚，再交给 MVC 异常处理器 |
 | 为什么不能随便 catch？ | 吞掉异常后，事务代理可能看到正常返回而提交 |
@@ -242,5 +252,11 @@ HTTP 请求 → Spring MVC 解析参数并校验
 可以在 `transfer()` 的三次写入处、模拟异常处和全局处理器处打断点，观察异常如何穿过事务代理到达全局异常处理器。
 
 本示例只演示单数据源事务。`simulateFailure` 是学习开关；真实资金系统还需要身份验证、权限控制、幂等、防重复提交和完整审计等设计。应用默认只监听本机地址。
+
+## 账户转账回归验证
+
+执行 `.\mvnw.cmd test`，运行 `src/test/java/com/example/springstudy/AccountTransferMyBatisTest.java`。
+测试使用独立 H2 内存库、真实 Mapper XML 和 Spring 事务代理，验证账户查询、转账主键回填、条件扣款、
+余额不足、账户不存在、同账户拦截，以及模拟失败和插入异常时的余额与记录回滚，不连接本机 MySQL。
 
 参考：[Spring Boot 依赖版本元数据](https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-parent/maven-metadata.xml)、[Spring Boot 官方文档](https://docs.spring.io/spring-boot/)、[JavaGuide Spring 总结](https://javaguide.cn/system-design/framework/spring/spring-knowledge-and-questions-summary.html)。

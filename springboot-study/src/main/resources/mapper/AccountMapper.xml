@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.springstudy.mapper.AccountMapper">
+
+    <!-- AccountDO 是不可变 record，按构造参数显式映射，无需改成带 setter 的 JavaBean。 -->
+    <resultMap id="accountResultMap" type="AccountDO" autoMapping="false">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="owner" javaType="java.lang.String"/>
+            <arg column="balance_in_cents" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
+    <select id="listAccounts" resultMap="accountResultMap">
+        SELECT id, owner, balance_in_cents
+        FROM account
+        ORDER BY id
+    </select>
+
+    <select id="getAccountById" resultMap="accountResultMap">
+        SELECT id, owner, balance_in_cents
+        FROM account
+        WHERE id = #{id}
+    </select>
+
+    <!-- 原子条件更新，避免先查余额再无条件扣款造成并发超扣；0 行表示未成功扣款。 -->
+    <update id="deductBalance">
+        UPDATE account
+        SET balance_in_cents = balance_in_cents - #{amount}
+        WHERE id = #{id} AND balance_in_cents &gt;= #{amount}
+    </update>
+
+    <update id="addBalance">
+        UPDATE account
+        SET balance_in_cents = balance_in_cents + #{amount}
+        WHERE id = #{id}
+    </update>
+</mapper>

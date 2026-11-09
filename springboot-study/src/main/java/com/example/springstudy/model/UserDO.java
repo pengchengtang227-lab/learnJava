@@ -1,12 +1,18 @@
 package com.example.springstudy.model;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * 对应 study_user 表的数据对象，字段映射由 UserMapper.xml 的 resultMap 明确配置。
  * 使用普通 JavaBean 而不是不可变 record，是为了让 MyBatis 回填数据库生成的 ID。
  * 本例没有密码等敏感字段，因此和账户示例一样直接返回；业务扩大后可单独定义响应 VO。
+ * 关联查询也使用此类：profile 演示 association，orders 演示 collection。
  */
+@Getter
+@Setter
 public class UserDO {
 
     /** 数据库自增主键；插入前为空，插入后通过 keyProperty="id" 回填。 */
@@ -25,61 +31,11 @@ public class UserDO {
     private LocalDateTime gmtCreate;
     private LocalDateTime gmtModified;
 
-    public Long getId() {
-        return id;
-    }
+    /** 用户资料；仅关联查询填充，没有资料时为 null。 */
+    private UserProfileDO profile;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getUserName() {
-        return userName;
-    }
-
-    public void setUserName(String userName) {
-        this.userName = userName;
-    }
-
-    public Integer getAge() {
-        return age;
-    }
-
-    public void setAge(Integer age) {
-        this.age = age;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public Integer getGender() {
-        return gender;
-    }
-
-    public void setGender(Integer gender) {
-        this.gender = gender;
-    }
-
-    public LocalDateTime getGmtCreate() {
-        return gmtCreate;
-    }
-
-    public void setGmtCreate(LocalDateTime gmtCreate) {
-        this.gmtCreate = gmtCreate;
-    }
-
-    public LocalDateTime getGmtModified() {
-        return gmtModified;
-    }
-
-    public void setGmtModified(LocalDateTime gmtModified) {
-        this.gmtModified = gmtModified;
-    }
+    /** 用户订单；仅关联查询填充，没有订单时返回空列表。 */
+    private List<UserOrderDO> orders;
 
     @Override
     public String toString() {

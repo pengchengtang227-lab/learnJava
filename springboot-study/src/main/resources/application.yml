@@ -32,6 +32,8 @@ spring:
 # Mapper 接口上的 @Mapper 由 Starter 扫描；XML 中保存具体 SQL。
 mybatis:
   mapper-locations: classpath:mapper/*.xml
+  # 注册类型别名后，Mapper XML 中可直接使用 UserDO，无需写全限定类名。
+  type-aliases-package: com.example.springstudy.model
 
 # 启动后访问 /swagger-ui.html，在浏览器中填写参数并调用接口。
 springdoc:

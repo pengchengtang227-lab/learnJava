@@ -43,6 +43,21 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public UserDO getUserRelations(Long userId) {
+        // LEFT JOIN 保留没有资料、没有订单的用户，只有用户本身不存在才返回 404。
+        return Optional.ofNullable(userMapper.getUserRelations(userId))
+                .orElseThrow(() -> userNotFound(userId));
+    }
+
+    @Override
+    public UserDO getUserRelationsByNestedSelect(Long userId) {
+        // 只调用主查询；MyBatis 根据 XML 的 select 自动查询资料和订单并填入 UserDO。
+        // 用户存在但没有关联数据时，仍正常返回，profile 为 null、orders 为空列表。
+        return Optional.ofNullable(userMapper.getUserRelationsByNestedSelect(userId))
+                .orElseThrow(() -> userNotFound(userId));
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public UserDO saveUser(SaveUserRequest request) {
         UserDO user = toUser(request);
@@ -69,6 +84,9 @@ public class UserServiceImpl implements UserService {
     public void removeUser(Long userId) {
         // 先查询确认目标，再按主键删除；重复删除返回 404。
         getUser(userId);
+        // 同一事务内先清理关联数据，避免删除用户后留下无主的资料或订单。
+        userMapper.deleteUserOrders(userId);
+        userMapper.deleteUserProfile(userId);
         if (userMapper.deleteUser(userId) == 0) {
             throw userNotFound(userId);
         }

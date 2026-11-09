@@ -28,6 +28,12 @@
 
     <!-- Spring Boot 统一管理下面的版本，不单独指定 Spring Framework 等依赖版本。 -->
     <dependencies>
+        <!-- Lombok 在编译时生成 getter/setter，版本由 Spring Boot 管理。 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
         <!-- Spring MVC：接收 HTTP 请求，将 Java 对象序列化为 JSON。 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -49,7 +55,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
-        <!-- JDBC、连接池和事务管理器均由 Spring Boot 自动配置。 -->
+        <!-- MyBatis 底层使用 JDBC；保留连接池和 Spring 本地事务所需的基础设施。 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
@@ -80,14 +86,48 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
+        <!-- 隔离内存数据库验证真实 Mapper SQL、主键回填和事务提交/回滚。 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
+            <!-- 显式启用 Lombok 注解处理，生成 JavaBean 的访问方法。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
             <!-- 支持 spring-boot:run，并将应用打包为可执行 jar。 -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- Lombok 仅编译时使用，不放入运行包。 -->
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
             </plugin>
         </plugins>
     </build>

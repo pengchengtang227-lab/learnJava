@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.springstudy.mapper.TransferMapper">
+
+    <!-- 方法返回受影响行数；数据库生成的 id 写回 TransferRecordDO，不能使用不可变请求 record。 -->
+    <insert id="insertTransfer" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO transfer_record (from_account_id, to_account_id, amount_in_cents)
+        VALUES (#{fromAccountId}, #{toAccountId}, #{amountInCents})
+    </insert>
+</mapper>

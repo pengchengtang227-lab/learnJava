@@ -12,6 +12,12 @@ public interface UserService {
 
     UserDO getUser(Long userId);
 
+    /** 查询用户、单个资料和多个订单；用户不存在时返回 404。 */
+    UserDO getUserRelations(Long userId);
+
+    /** 用嵌套查询加载相同的用户资料和订单，便于对照 JOIN 的嵌套结果映射。 */
+    UserDO getUserRelationsByNestedSelect(Long userId);
+
     UserDO saveUser(SaveUserRequest request);
 
     /** 返回更新后的完整用户数据；用户不存在时抛出业务异常。 */
