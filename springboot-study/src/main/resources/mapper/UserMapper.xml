@@ -163,6 +163,15 @@
         VALUES (#{userName}, #{age}, #{email}, #{gender})
     </insert>
 
+    <!-- 每组调用一次；foreach 将该组展开为 VALUES (...), (...)，不是循环执行单条 INSERT。 -->
+    <insert id="insertUsers">
+        INSERT INTO study_user (user_name, age, email, gender)
+        VALUES
+        <foreach collection="users" item="user" separator=",">
+            (#{user.userName}, #{user.age}, #{user.email}, #{user.gender})
+        </foreach>
+    </insert>
+
     <!-- PUT 更新完整的可编辑字段；WHERE id 只影响目标用户，不修改创建时间。 -->
     <update id="updateUser">
         UPDATE study_user

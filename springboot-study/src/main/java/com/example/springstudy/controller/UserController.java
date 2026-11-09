@@ -1,6 +1,7 @@
 package com.example.springstudy.controller;
 
 import com.example.springstudy.common.ApiResponse;
+import com.example.springstudy.dto.BatchSaveUserRequest;
 import com.example.springstudy.dto.SaveUserRequest;
 import com.example.springstudy.model.UserDO;
 import com.example.springstudy.service.UserService;
@@ -59,6 +60,15 @@ public class UserController {
     @Operation(summary = "新增用户", description = "用户名不能重复；成功返回 201，data.id 为数据库生成的主键。")
     public ResponseEntity<ApiResponse<UserDO>> saveUser(@Valid @RequestBody SaveUserRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(userService.saveUser(request)));
+    }
+
+    /** 批量 Create：先校验整个列表，再由 Service 分组，XML foreach 生成多行 INSERT。 */
+    @PostMapping("/batch")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "批量新增用户：分组 + foreach",
+            description = "一次 1～10000 条，每组最多 500 条；全部成功返回插入数量，任意一组失败则全部回滚。")
+    public ApiResponse<Integer> saveUsers(@Valid @RequestBody BatchSaveUserRequest request) {
+        return ApiResponse.success(userService.saveUsers(request.users()));
     }
 
     /** Update：PUT 提交完整的可编辑字段；成功返回 200 和更新后的完整用户数据。 */

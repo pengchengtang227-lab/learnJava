@@ -20,6 +20,9 @@ public interface UserService {
 
     UserDO saveUser(SaveUserRequest request);
 
+    /** 分组批量新增，返回总插入数量；任意一组失败，整个请求回滚。 */
+    int saveUsers(List<SaveUserRequest> requests);
+
     /** 返回更新后的完整用户数据；用户不存在时抛出业务异常。 */
     UserDO updateUser(Long userId, SaveUserRequest request);
 

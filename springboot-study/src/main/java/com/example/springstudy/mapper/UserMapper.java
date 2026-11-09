@@ -35,6 +35,9 @@ public interface UserMapper {
     // 返回受影响行数；生成的主键写回 user.id，二者不是同一个结果。
     int insertUser(UserDO user);
 
+    /** 接收非空分组，foreach 生成一条多行 INSERT；只返回数量，不回填每个用户的 ID。 */
+    int insertUsers(@Param("users") List<UserDO> users);
+
     int updateUser(UserDO user);
 
     int deleteUser(@Param("id") Long userId);

@@ -57,6 +57,7 @@
 | 操作 | HTTP 方法与路径 | 结果 |
 | --- | --- | --- |
 | 新增 | `POST /api/users` | 201，返回用户、自增 ID 和数据库时间 |
+| 批量新增 | `POST /api/users/batch` | 201，`data` 返回插入数量，每组最多 500 条，全部成功才提交 |
 | 查询列表 | `GET /api/users` | 200，按 ID 排序；本例返回全部用户 |
 | 查询详情 | `GET /api/users/{id}` | 200；用户不存在则 404 |
 | 修改 | `PUT /api/users/{id}` | 200，返回更新后的完整用户数据；需提交完整的可编辑字段；用户不存在则 404 |
@@ -356,3 +357,71 @@ JSON 由 Jackson 默认将枚举序列化为名称，因此现有响应格式保
 当前接口只查一个用户，立即加载两种关联时通常执行 3 次 SQL。若改为查询 N 个用户，并给每个用户分别查询资料和订单，在无缓存命中的情况下可能执行 `1 + 2N` 次 SQL；只查询一种关联时则是 `1 + N` 次。
 
 嵌套查询支持延迟加载。若要练习，可将关联上的 `fetchType="eager"` 改成 `fetchType="lazy"`；若要跟随全局 `lazy-loading-enabled` 配置，应去掉显式的 `fetchType`。HTTP 接口将对象序列化为 JSON 时也可能访问关联属性并触发查询，因此延迟加载不保证消除 N+1。
+
+## 八、分组 + foreach 多行插入
+
+重启应用后，在 Swagger 的“用户管理”分组调用 `POST /api/users/batch`。请求示例：
+
+```json
+{
+  "users": [
+    {"userName": "batch-alice", "age": 20, "email": "alice@example.com", "gender": 1},
+    {"userName": "batch-bob", "age": 21, "email": "bob@example.com"}
+  ]
+}
+```
+
+成功返回 HTTP 201：
+
+```json
+{"code": "SUCCESS", "message": "操作成功", "data": 2}
+```
+
+这里 `data` 表示插入数量，不返回用户 ID；再次提交相同用户名会触发唯一约束并返回 409。
+
+| 位置 | 职责 |
+| --- | --- |
+| `BatchSaveUserRequest` | 校验列表非空、最多 10000 条、元素不能是 null；级联复用 `SaveUserRequest` 的字段校验 |
+| `UserController.saveUsers` | 接收 JSON，`@Valid` 校验通过后调用 Service |
+| `UserServiceImpl.saveUsers` | 去掉用户名首尾空格、默认性别为 0、检查本请求的同名数据，然后按 500 条分组 |
+| `UserMapper.insertUsers` | 接收一组用户，返回该条 INSERT 的实际影响行数 |
+| XML 的 `insertUsers` | `foreach` 生成 `VALUES (...), (...)`，一次插入整组 |
+
+Service 的分组循环如下，`users` 是校验并转换好的 `List<UserDO>`：
+
+```java
+int insertedCount = 0;
+for (int start = 0; start < users.size(); start += INSERT_GROUP_SIZE) {
+    int end = Math.min(start + INSERT_GROUP_SIZE, users.size());
+    insertedCount += userMapper.insertUsers(users.subList(start, end));
+}
+return insertedCount;
+```
+
+`INSERT_GROUP_SIZE` 为 500，`subList(start, end)` 取左闭右开的区间，作为本次 INSERT 的参数。
+例如 1200 条用户分成 `[0, 500)`、`[500, 1000)`、`[1000, 1200)`，分别插入 500、500、200 条。
+`Math.min` 保证最后一组不足 500 条时不会越界；循环只读取该视图，不修改原列表结构。
+
+Mapper 接口的 `@Param("users")` 与 XML 中的 `collection="users"` 对应：
+
+```xml
+<insert id="insertUsers">
+    INSERT INTO study_user (user_name, age, email, gender)
+    VALUES
+    <foreach collection="users" item="user" separator=",">
+        (#{user.userName}, #{user.age}, #{user.email}, #{user.gender})
+    </foreach>
+</insert>
+```
+
+其中 `item="user"` 是当前元素的名称，`separator=","` 让相邻记录用逗号分隔，
+`#{...}` 将每个字段绑定为 JDBC 参数。两条数据对应 `VALUES (?, ?, ?, ?), (?, ?, ?, ?)`。
+该实现继续使用默认 SIMPLE 执行器，每组立即执行一条多行 INSERT，无需 BATCH 或 `flushStatements()`。
+500 是当前学习示例的分组大小，不是所有项目通用的最佳值。
+
+`saveUsers` 整个方法由 `@Transactional(rollbackFor = Exception.class)` 管理，所有组使用同一个事务：
+全部成功后提交；任意一组失败，之前已插入的组也回滚。分组执行不等于每组提交。
+请求内完全相同的规范化用户名会在插入前被拒绝，数据库已有重名、大小写比较等最终以数据库唯一约束为准。
+非法列表、字段返回 400；用户名重复返回 409，均不留下部分导入的数据。
+
+运行 `.\mvnw.cmd test` 可验证分组边界、实际 SQL 次数、字段映射、嵌套参数校验和跨组失败回滚。

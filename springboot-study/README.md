@@ -4,6 +4,9 @@
 
 账户、转账记录和用户管理统一使用 MyBatis：Service 注入 Mapper 接口，SQL 放在 `src/main/resources/mapper/`。
 
+批量新增用户可调用 `POST /api/users/batch`，一次最多 10000 条，每组 500 条通过 `foreach` 生成多行 INSERT，
+全部成功后统一提交；调用示例和代码说明见 [分组批量插入](MYBATIS.md#八分组--foreach-多行插入)。
+
 新增的 **MyBatis 用户 CRUD + 本地 MySQL** 示例见 [MYBATIS.md](MYBATIS.md)，包含连接配置、启动步骤、接口示例和源码阅读顺序。应用默认连接本机 MySQL，数据持久保存，直接运行启动类即可。
 
 学习 `association` 和 `collection` 可看 [关联查询示例](MYBATIS.md#六关联查询association--collection)：一个用户关联一份资料和多个订单，重启后在 Swagger 的“MyBatis 关联查询”分组调用 `GET /api/users/{id}/relations`。

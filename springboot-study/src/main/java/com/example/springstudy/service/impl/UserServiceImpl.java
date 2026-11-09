@@ -1,14 +1,18 @@
 package com.example.springstudy.service.impl;
 
+import com.example.springstudy.dto.BatchSaveUserRequest;
 import com.example.springstudy.dto.PatchUserRequest;
 import com.example.springstudy.dto.SaveUserRequest;
 import com.example.springstudy.exception.BusinessException;
 import com.example.springstudy.mapper.UserMapper;
 import com.example.springstudy.model.UserDO;
 import com.example.springstudy.service.UserService;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +27,7 @@ import org.springframework.util.StringUtils;
 public class UserServiceImpl implements UserService {
 
     private static final int GENDER_UNKNOWN = 0;
+    private static final int INSERT_GROUP_SIZE = 500;
 
     private final UserMapper userMapper;
 
@@ -64,6 +69,37 @@ public class UserServiceImpl implements UserService {
         userMapper.insertUser(user);
         // user.id 已回填；再查询可获取数据库自动生成的创建和修改时间。
         return getUser(user.getId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int saveUsers(List<SaveUserRequest> requests) {
+        if (CollectionUtils.isEmpty(requests) || requests.size() > BatchSaveUserRequest.MAX_USER_COUNT) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "用户列表必须包含 1～10000 条数据");
+        }
+
+        List<UserDO> users = new ArrayList<>(requests.size());
+        Set<String> userNames = new HashSet<>();
+        for (SaveUserRequest request : requests) {
+            if (Objects.isNull(request)) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "用户列表不能包含 null");
+            }
+            UserDO user = toUser(request);
+            // 先检查请求内部去掉首尾空格后的重名；数据库唯一索引仍负责最终防重复。
+            if (!userNames.add(user.getUserName())) {
+                throw new BusinessException(HttpStatus.CONFLICT, "DATA_CONFLICT", "用户列表中存在重复用户名");
+            }
+            users.add(user);
+        }
+
+        int insertedCount = 0;
+        for (int start = 0; start < users.size(); start += INSERT_GROUP_SIZE) {
+            int end = Math.min(start + INSERT_GROUP_SIZE, users.size());
+            // subList 是原列表的只读用途视图：[start, end)，最后一组不足 500 条也能处理。
+            insertedCount += userMapper.insertUsers(users.subList(start, end));
+        }
+        // 每组执行一条 SQL，整个方法只提交一次事务；异常直接向外抛出以触发回滚。
+        return insertedCount;
     }
 
     @Override
